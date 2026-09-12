@@ -12,6 +12,8 @@ Before making substantial changes, read:
 4. relevant type definitions / interfaces
 5. `BACKEND_EVALUATION_RULES.md` when working on research, scoring, candidate structuring, or LLM prompts
 6. `SEARCH_STRATEGY.md` when working on research, retrieval, or query generation
+7. `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` when working on live research, progress UI, Firecrawl webhooks, or Realtime updates
+8. `LIVE_RESEARCH_IMPLEMENTATION.md` when implementing live research, progress UI, Firecrawl webhooks, Realtime, or research orchestration
 
 Do not redesign the product or architecture unless the task explicitly requires it.
 
@@ -26,6 +28,30 @@ Follow `SEARCH_STRATEGY.md`: diversified search dimensions (direct, physical pri
 The LLM extracts structured facts. Deterministic code in `src/lib/research` assigns category, confidence, applicability, and evidence quality.
 
 Do **not** ask the model whether a candidate is Established, Adjacent, or Exploratory. Do **not** invent parallel classification logic in the UI or prompts.
+
+### Live research progress (hard)
+
+Follow `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` for requirements and `LIVE_RESEARCH_IMPLEMENTATION.md` for the mandatory build contract.
+
+Live progress must come from real backend events persisted in Supabase, not mocked timers or invented messages.
+
+Canonical path:
+
+```text
+Firecrawl Search → Batch Scrape → signed webhook → per-source analysis → Supabase Realtime → UI
+```
+
+Do **not**:
+
+- drive research phases with `setTimeout` or hardcoded progress sequences,
+- invent source counts, candidate counts, or percentage completion,
+- show fake “currently reviewing” titles that are not tied to stored sources,
+- block the Firecrawl webhook response on slow LLM analysis,
+- invent an alternate live-research architecture that bypasses webhooks + Realtime.
+
+Animations are allowed. Every displayed phase, counter, source, and candidate must map to persisted run state.
+
+If the UI can look complete without Firecrawl webhooks updating Supabase, the implementation is wrong.
 
 ---
 
