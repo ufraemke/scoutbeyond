@@ -790,3 +790,152 @@ export type FirecrawlImportBatch = {
   providerVerificationSummary?: FirecrawlVerificationSummary | null;
   searchGaps: string[];
 };
+
+// --------------------------------------------------
+// LIVE RESEARCH RUN CONTRACT
+// --------------------------------------------------
+
+export type ResearchRunStatus =
+  | "queued"
+  | "searching"
+  | "scraping"
+  | "analysing"
+  | "counter_checking"
+  | "synthesising"
+  | "completed"
+  | "failed";
+
+export type ResearchSourceStatus =
+  | "discovered"
+  | "scraping"
+  | "scraped"
+  | "analysing"
+  | "analysed"
+  | "failed";
+
+export type SourceAnalysisStatus =
+  | "pending"
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export type ScrapeJobPhase = "initial_research" | "counter_check";
+
+export type CandidateVerificationState =
+  | "provisional"
+  | "verified"
+  | "rejected";
+
+export type SearchQueryDimension =
+  | "direct"
+  | "physical_principle"
+  | "adjacent_application"
+  | "cross_industry"
+  | "emerging";
+
+export type DiversifiedSearchQuery = {
+  query: string;
+  dimension: SearchQueryDimension;
+  rationale?: string;
+};
+
+export type ResearchRunRecord = {
+  id: string;
+  ownerId: string;
+  challenge: string;
+  structuredProblem: StructuredProblem;
+  status: ResearchRunStatus;
+  phase: string;
+  errorMessage?: string | null;
+  sourcesFound: number;
+  sourcesScraped: number;
+  sourcesAnalysed: number;
+  sourcesFailed: number;
+  candidatesCount: number;
+  searchQueries: DiversifiedSearchQuery[];
+  warnings: string[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+};
+
+export type ResearchSourceRecord = {
+  id: string;
+  researchRunId: string;
+  url: string;
+  canonicalUrl: string;
+  title?: string | null;
+  description?: string | null;
+  searchDimension?: SearchQueryDimension | string | null;
+  searchQuery?: string | null;
+  status: ResearchSourceStatus;
+  analysisStatus: SourceAnalysisStatus;
+  scrapeId?: string | null;
+  markdown?: string | null;
+  metadata?: Record<string, unknown>;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  scrapedAt?: string | null;
+  analysedAt?: string | null;
+};
+
+export type ResearchEventRecord = {
+  id: string;
+  researchRunId: string;
+  eventType: string;
+  message: string;
+  payload?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type LiveCandidateRecord = {
+  id: string;
+  researchRunId: string;
+  name: string;
+  principle: string;
+  normalizedPrinciple: string;
+  category: CandidateCategory;
+  summary: string;
+  relevance: string;
+  classificationEvidence?: ClassificationInput;
+  applicability?: ApplicabilityAssessment | Record<string, unknown>;
+  confidence?: ConfidenceLevel | null;
+  evidenceQuality?: EvidenceQuality | null;
+  benefits: string[];
+  limitations: string[];
+  uncertainties: Uncertainty[] | string[];
+  maturity?: MaturityAssessment | Record<string, unknown>;
+  industries: string[];
+  physicalMechanisms: string[];
+  verificationState: CandidateVerificationState;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LiveEvidenceRecord = {
+  id: string;
+  researchRunId: string;
+  candidateId: string;
+  sourceId: string;
+  finding: string;
+  relevance: string;
+  stance: EvidenceStance;
+  confidence?: ConfidenceLevel | null;
+  exactExcerpt?: string | null;
+  createdAt: string;
+  source?: Pick<
+    ResearchSourceRecord,
+    "id" | "url" | "canonicalUrl" | "title"
+  >;
+};
+
+export type ResearchRunSnapshot = {
+  run: ResearchRunRecord;
+  sources: ResearchSourceRecord[];
+  events: ResearchEventRecord[];
+  candidates: LiveCandidateRecord[];
+  evidence: LiveEvidenceRecord[];
+};

@@ -1,484 +1,202 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { AppHeader } from "@/components/layout/app-header";
+import {
+  DEMO_BRIEF,
+  DEMO_CANDIDATES,
+  DEMO_CHALLENGE,
+  DEMO_MODE_LABEL,
+  type DemoCandidate,
+} from "@/data/demo/tank-cleaning";
+import { ensureAnonymousSession } from "@/lib/supabase/anonymous";
+import type { CandidateCategory } from "@/types";
 
-// Types
-interface SourceItem {
-  title: string;
-  url: string;
-  tier: string;
-  metrics: string;
-  snippet: string;
-}
-
-interface TechnologyCandidate {
-  id: string;
-  title: string;
-  principle: string;
-  meta: string[];
-  evidence_count: number;
-  selected: boolean;
-  category: "established" | "adjacent" | "exploratory";
-  sources: SourceItem[];
-}
-
-interface StructuredBrief {
-  problem: string;
-  goals: string[];
-  constraints: string[];
-  assumptions: string[];
-  unknowns: string[];
-  search_dimensions: string[];
-  primary_scope: string;
-  adjacent_scope: string;
-  evidence_types: string;
-  confidence_level: string;
-  confidence_note: string;
-}
+type ResearchMode = "live" | "prepared" | null;
+type CandidateFilter = "all" | CandidateCategory;
 
 export default function Home() {
-  const [step, setStep] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [rawInput, setRawInput] = useState<string>("");
-  const [sessionId, setSessionId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"all" | "established" | "adjacent" | "exploratory">("all");
-  
-  // Modal states
-  const [modalSource, setModalSource] = useState<{ title: string; sources: SourceItem[] } | null>(null);
-  const [showExportModal, setShowExportModal] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
-
-  // Brief state
-  const [brief, setBrief] = useState<StructuredBrief>({
-    problem: "How can tank cleaning be adapted to actual cleaning need while reducing water consumption and cleaning time?",
-    goals: ["Reduce water consumption by >50%", "Reduce wash cycle duration", "Maintain hygiene standards"],
-    constraints: ["Industrial manufacturing environment", "Prefer retrofit into existing tanks"],
-    assumptions: ["Cleaning intensity can be modulated dynamically", "Cycle can terminate upon clean detection"],
-    unknowns: ["Residue tenacity and adhesion kinetics", "Allowable acoustic/thermal stress on vessel"],
-    search_dimensions: ["Adaptive kinetic impingement", "In-situ residue sensing", "Closed-loop feedback control", "Anti-fouling surface engineering"],
-    primary_scope: "Industrial cleaning · manufacturing · tank operations",
-    adjacent_scope: "Semiconductors, robotics, optics, and surface science",
-    evidence_types: "Peer-reviewed scientific papers · patents · industrial standards",
-    confidence_level: "High",
-    confidence_note: "Primary uncertainty is exact residue adhesion across different production batches."
-  });
-
-  // Candidates state
-  const [candidates, setCandidates] = useState<TechnologyCandidate[]>([
-    {
-      id: "within-1",
-      title: "Adaptive high-pressure jet cleaning",
-      principle: "Modulate nozzle pressure and flow to actual cleaning demand rather than running fixed-duration cycles.",
-      meta: ["High problem fit", "Established", "TRL 8"],
-      evidence_count: 8,
-      selected: true,
-      category: "established",
-      sources: [
-        {
-          title: "Fraunhofer IVV: Resource-efficient pulsed jet cleaning for machinery parts",
-          url: "https://www.fraunhofer.de/en/research/cleaning-technologies.html",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "82% water reduction at 6 bar pressure; cycle shortened by 55s",
-          snippet: "Empirical study demonstrating demand-modulated jet velocity prevents over-washing once organic residue threshold is reached."
-        },
-        {
-          title: "US Patent 9,876,543: Adaptive nozzle array with variable flow geometry",
-          url: "https://patents.google.com/patent/US9876543B2/en",
-          tier: "TIER_1_PATENT",
-          metrics: "Dynamic throttle from 12 L/min down to 2.5 L/min in continuous loop",
-          snippet: "Multi-stage valve switching modulates spray pattern based on online turbidity feedback."
-        },
-        {
-          title: "ScienceDirect: Empirical analysis of pressure impingement in industrial washing",
-          url: "https://www.sciencedirect.com/science/article/pii/S0301679X2200189X",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Surface roughness maintained below 0.8 μm Ra without chemical surfactants",
-          snippet: "High-pressure kinetic impact dislodges particulate matter faster than thermal soaking, slashing wash duration."
-        }
-      ]
-    },
-    {
-      id: "within-2",
-      title: "Closed-loop adaptive cleaning control",
-      principle: "Continuously measure effluent turbidity and conductivity to terminate cycles immediately upon cleanliness.",
-      meta: ["High water potential", "TRL 7", "Closed-loop"],
-      evidence_count: 6,
-      selected: true,
-      category: "established",
-      sources: [
-        {
-          title: "IEEE Trans. Ind. Inf.: Closed-loop PLC timing optimization for CIP systems",
-          url: "https://ieeexplore.ieee.org/document/8492019",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "45% cycle time reduction, 38% effluent volume reduction",
-          snippet: "Programmable logic controllers dynamically terminate rinse phases when optical transmittance reaches clean baseline."
-        },
-        {
-          title: "VDI 2083: Cleanroom and precision component washing guidelines",
-          url: "https://www.vdi.de/richtlinien/details/vdi-2083-blatt-92",
-          tier: "TIER_2_TECHNICAL_SPEC",
-          metrics: "Continuous conductivity sensing with 1.2% measurement uncertainty",
-          snippet: "Technical standard validating conductivity cutoff points as a compliant measure for rinsing completeness."
-        }
-      ]
-    },
-    {
-      id: "within-3",
-      title: "Continuous UV contamination monitoring",
-      principle: "Use in-situ fluorescence to detect micro-gram organic residues on vessel surfaces in real time.",
-      meta: ["Time reduction", "Medium maturity"],
-      evidence_count: 5,
-      selected: false,
-      category: "established",
-      sources: [
-        {
-          title: "Sensors and Actuators B: In-situ fluorescence sensing of hydrocarbon residues",
-          url: "https://www.sciencedirect.com/science/article/pii/S092540052031122X",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Detection threshold 5 mg/m² residue on steel in <2 seconds",
-          snippet: "UV-excited fluorescence detects lubricating oils and residue, signaling instantaneous cycle termination."
-        }
-      ]
-    },
-    {
-      id: "within-4",
-      title: "Fluidic oscillator swept-jet nozzles",
-      principle: "Utilize fluidic oscillation without moving mechanical parts to sweep high-momentum jets across walls.",
-      meta: ["High maturity", "No-wear retrofit"],
-      evidence_count: 7,
-      selected: false,
-      category: "established",
-      sources: [
-        {
-          title: "Journal of Fluid Mechanics: Impinging fluid jet mechanics on complex geometries",
-          url: "https://www.cambridge.org/core/journals/journal-of-fluid-mechanics",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Wall shear stress increased by 3.2x with zero internal moving seals",
-          snippet: "Self-oscillating hydrodynamic swept nozzles eliminate wear parts while multiplying cleaning impact."
-        }
-      ]
-    },
-    {
-      id: "beyond-1",
-      title: "Multi-spectral machine-vision inspection",
-      principle: "Transferred from semiconductor wafer QA: classify residual fouling spots in 200ms to direct targeted spot-wash.",
-      meta: ["Adjacent (Semiconductors)", "Targeted wash"],
-      evidence_count: 7,
-      selected: false,
-      category: "adjacent",
-      sources: [
-        {
-          title: "Robotics and CIM: Automated optical inspection for semiconductor wafer cleaning",
-          url: "https://www.sciencedirect.com/science/article/pii/S073658452100045X",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Multi-spectral imaging classifies residual contamination in 220ms",
-          snippet: "Cross-domain transfer from silicon cleanrooms directs spot-cleaning rather than high-volume flooding."
-        }
-      ]
-    },
-    {
-      id: "beyond-2",
-      title: "Model-predictive disturbance control",
-      principle: "Transferred from chemical reactors: algorithmic feedforward dosing adapts to temperature, fill levels, and soil age.",
-      meta: ["Adjacent (Chemical Processing)", "Algorithmic"],
-      evidence_count: 4,
-      selected: false,
-      category: "adjacent",
-      sources: [
-        {
-          title: "Control Engineering Practice: Model-predictive control in chemical batch processing",
-          url: "https://www.sciencedirect.com/science/article/pii/S096706612100188X",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Feedforward disturbance rejection reduces rinse overshoot by 60%",
-          snippet: "Adapts fluid temperature and dosing dynamically based on empirical residue kinetics."
-        }
-      ]
-    },
-    {
-      id: "beyond-3",
-      title: "Oleophobic / hydrophobic surface coatings",
-      principle: "Biomimetic nanostructured low-surface-energy surface texturing reduces residue adhesion bond strength.",
-      meta: ["Exploratory", "Materials Science"],
-      evidence_count: 4,
-      selected: false,
-      category: "exploratory",
-      sources: [
-        {
-          title: "ACS Applied Materials & Interfaces: Oleophobic nanostructured coatings",
-          url: "https://pubs.acs.org/doi/10.1021/acsami.1c04512",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Contact angle >155°, reduces required wash pressure by 70%",
-          snippet: "Prevents fouling buildup on tooling surfaces, slashing necessary wash volume."
-        }
-      ]
-    },
-    {
-      id: "beyond-4",
-      title: "Megasonic acoustic cavitation",
-      principle: "Transferred from optics & electronics: micro-jet cavitation bubble collapse dislodges biofilms without solvents.",
-      meta: ["Adjacent (Optics/Electronics)", "90% Water reduction"],
-      evidence_count: 6,
-      selected: false,
-      category: "adjacent",
-      sources: [
-        {
-          title: "Ultrasonics Sonochemistry: Megasonic agitation in precision instrument cleaning",
-          url: "https://www.sciencedirect.com/science/article/pii/S135041772100092X",
-          tier: "TIER_1_ACADEMIC",
-          metrics: "Sub-micron particulate dislodgement at 40 kHz with 90% water reduction",
-          snippet: "Cavitation bubble collapse generates localized micro-jets at >100 m/s, stripping biofilms in seconds."
-        }
-      ]
-    }
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [maxStep, setMaxStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [rawInput, setRawInput] = useState("");
+  const [mode, setMode] = useState<ResearchMode>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<CandidateFilter>("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([
+    DEMO_CANDIDATES[0].id,
+    DEMO_CANDIDATES[1].id,
   ]);
+  const [modalCandidate, setModalCandidate] =
+    useState<DemoCandidate | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Selected candidates for comparison
-  const selectedCandidates = candidates.filter((c) => c.selected);
+  const selectedCandidates = useMemo(
+    () => DEMO_CANDIDATES.filter((candidate) => selectedIds.includes(candidate.id)),
+    [selectedIds],
+  );
 
-  // Dynamic state for comparison and shortlist
-  const [comparisonRows, setComparisonRows] = useState<any[] | null>(null);
-  const [shortlistItems, setShortlistItems] = useState<any[] | null>(null);
-  const [backendMarkdown, setBackendMarkdown] = useState<string | null>(null);
+  const filteredCandidates = useMemo(
+    () =>
+      activeTab === "all"
+        ? DEMO_CANDIDATES
+        : DEMO_CANDIDATES.filter(
+            (candidate) => candidate.category === activeTab,
+          ),
+    [activeTab],
+  );
 
-  // Handle Load Demo
-  const handleLoadDemo = () => {
-    setRawInput(
-      "What physical alternatives or complementary technologies exist to conventional spray cleaning for cleaning the interior of industrial tanks while reducing water consumption and cleaning cycle time?"
+  function goToStep(nextStep: number) {
+    if (nextStep <= maxStep) {
+      setStep(nextStep);
+    }
+  }
+
+  function advanceTo(nextStep: number) {
+    setStep(nextStep);
+    setMaxStep((current) => Math.max(current, nextStep));
+  }
+
+  function handleLoadDemo() {
+    setRawInput(DEMO_CHALLENGE);
+    setMode("prepared");
+    setError(null);
+  }
+
+  async function handleStartResearch() {
+    setLoading(true);
+    setError(null);
+
+    if (mode === "prepared") {
+      setLoading(false);
+      advanceTo(2);
+      return;
+    }
+
+    try {
+      await ensureAnonymousSession();
+      const response = await fetch("/api/research/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challenge: rawInput.trim() }),
+      });
+      const json = (await response.json()) as {
+        ok: boolean;
+        runId?: string;
+        message?: string;
+      };
+      if (!response.ok || !json.ok || !json.runId) {
+        throw new Error(
+          json.message ||
+            "Research could not be started. Check the service configuration and try again.",
+        );
+      }
+      router.push(`/research/${json.runId}`);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Research could not be started.",
+      );
+      setLoading(false);
+    }
+  }
+
+  function toggleCandidate(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id)
+        ? current.filter((candidateId) => candidateId !== id)
+        : [...current, id],
     );
-  };
+  }
 
-  // Step 1 -> Step 2
-  const handleStartResearch = async () => {
-    setLoading(true);
-    const input = rawInput.trim() || "What physical alternatives exist to conventional spray cleaning for industrial tanks?";
-    
-    try {
-      // Call backend if available
-      const res = await fetch("/pyapi/refine", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ problem: input })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.brief) {
-          setBrief(data.brief);
-        }
-        if (data.session_id) {
-          setSessionId(data.session_id);
-        }
-      }
-    } catch {
-      // Graceful fallback to rich domain default
-    }
+  const exportMarkdown = `# ScoutBeyond Prepared Technology Brief
 
-    setLoading(false);
-    setStep(2);
-  };
-
-  // Step 2 -> Step 3
-  const handleExploreLandscape = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/pyapi/scout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, brief })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.landscape) {
-          const within = (data.landscape.within || []).map((s: any) => ({ ...s, category: s.category || "established" }));
-          const beyond = (data.landscape.beyond || []).map((s: any) => ({
-            ...s,
-            category: s.category || (s.id.includes("3") ? "exploratory" : "adjacent")
-          }));
-          setCandidates([...within, ...beyond]);
-        }
-      }
-    } catch {
-      // Keep rich domain candidates
-    }
-    setLoading(false);
-    setStep(3);
-  };
-
-  // Step 3 -> Step 4
-  const handleCompare = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/pyapi/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          selected_ids: selectedCandidates.map((c) => c.id)
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.comparison && data.comparison.rows) {
-          setComparisonRows(data.comparison.rows);
-        }
-      }
-    } catch {
-      // Fallback
-    }
-    setLoading(false);
-    setStep(4);
-  };
-
-  // Step 4 -> Step 5
-  const handleShortlist = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/pyapi/shortlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          selected_ids: selectedCandidates.map((c) => c.id)
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.shortlist && Array.isArray(data.shortlist)) {
-          setShortlistItems(data.shortlist);
-        }
-        if (data.export_brief) {
-          setBackendMarkdown(data.export_brief);
-        }
-      }
-    } catch {
-      // Fallback
-    }
-    setLoading(false);
-    setStep(5);
-  };
-
-  // Toggle selection
-  const toggleCandidate = (id: string) => {
-    setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, selected: !c.selected } : c))
-    );
-  };
-
-  // Filtered candidates
-  const filteredCandidates = candidates.filter((c) => {
-    if (activeTab === "all") return true;
-    return c.category === activeTab;
-  });
-
-  // Shortlist generation markdown
-  const generateMarkdownBrief = () => {
-    if (backendMarkdown) return backendMarkdown;
-    return `# ScoutBeyond Technology Brief
+> Prepared demo dataset — not live web research.
 
 ## Problem Statement
-${brief.problem}
-
-## Scope & Operational Context
-- **Primary Domain**: ${brief.primary_scope}
-- **Adjacent Search Space**: ${brief.adjacent_scope}
-- **Engineering Constraints**: ${brief.constraints.join("; ")}
-- **Stated Assumptions**: ${brief.assumptions.join("; ")}
-
----
+${DEMO_BRIEF.problem}
 
 ## Shortlisted Physical Technology Solutions
 ${selectedCandidates
   .map(
-    (c, i) => `### ${i + 1}. ${c.title} (${c.category.toUpperCase()})
-- **Physical Principle**: ${c.principle}
-- **Evidence Count**: ${c.evidence_count} verified citations (patents & academic studies)
-- **Top Verified Metric**: ${c.sources[0]?.metrics || "High empirical density"}
-- **Source**: [${c.sources[0]?.title}](${c.sources[0]?.url})
-`
+    (candidate, index) => `### ${index + 1}. ${candidate.name}
+- Category: ${candidate.category}
+- Physical principle: ${candidate.principle}
+- Why relevant: ${candidate.relevance}
+- Main limitation: ${candidate.limitations.join("; ")}
+`,
   )
-  .join("\n")}
----
-*Generated by ScoutBeyond — Cross-Industry Engineering Technology Intelligence*`;
-  };
+  .join("\n")}`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(generateMarkdownBrief());
+  async function copyExport() {
+    await navigator.clipboard.writeText(exportMarkdown);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
+    window.setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f7f5] text-[#161616]">
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#e5e5e2] bg-white px-8">
-        <div className="flex items-center gap-4">
-          <span className="text-[17px] font-bold tracking-tight text-[#161616]">
-            ScoutBeyond
-          </span>
-          <span className="rounded-full bg-[#eaf3f6] px-2.5 py-0.5 text-[11px] font-semibold text-[#176b87]">
-            Technology Scanner
-          </span>
-        </div>
+      <AppHeader
+        currentStep={step}
+        maxAvailableStep={maxStep}
+        onStepChange={goToStep}
+      />
 
-        {/* Stepper Progress */}
-        <div className="flex items-center gap-2">
-          {[
-            { num: 1, label: "Intake" },
-            { num: 2, label: "Brief" },
-            { num: 3, label: "Landscape" },
-            { num: 4, label: "Compare" },
-            { num: 5, label: "Shortlist" },
-          ].map((s) => (
-            <button
-              key={s.num}
-              onClick={() => setStep(s.num)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-all ${
-                step === s.num
-                  ? "bg-[#161616] text-white"
-                  : step > s.num
-                  ? "bg-white text-[#161616] border border-[#e5e5e2]"
-                  : "text-[#8a8a8a]"
-              }`}
-            >
-              <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
-                step === s.num ? "bg-white text-[#161616]" : "bg-[#f0f0ec] text-[#626262]"
-              }`}>
-                {s.num}
-              </span>
-              <span>{s.label}</span>
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* Main Screen Container */}
       <main className="mx-auto max-w-[1200px] px-8 py-10">
-        {/* ========================================================= */}
-        {/* STEP 1: PROBLEM INTAKE                                   */}
-        {/* ========================================================= */}
-        {step === 1 && (
-          <div className="mx-auto max-w-[820px]">
-            <p className="text-[12px] font-bold tracking-wider uppercase text-[#176b87]">
+        {mode === "prepared" && step > 1 ? <PreparedDemoBanner /> : null}
+
+        {step === 1 ? (
+          <section className="mx-auto max-w-[820px]">
+            <p className="text-[12px] font-bold uppercase tracking-wider text-[#176b87]">
               Step 1 · Problem Intake
             </p>
             <h1 className="mt-2 text-[36px] font-semibold tracking-tight text-[#161616]">
               Find physical technologies beyond your industry.
             </h1>
             <p className="mt-3 text-[16px] leading-relaxed text-[#626262]">
-              Describe your manufacturing or engineering challenge in plain language.
-              ScoutBeyond extracts core physical mechanisms and scans adjacent sectors for transferable solutions.
+              Describe your manufacturing or engineering challenge in plain
+              language. ScoutBeyond extracts core physical mechanisms and scans
+              adjacent sectors for transferable solutions.
             </p>
 
             <div className="mt-8 rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
-              <label className="block text-[13px] font-semibold text-[#161616]">
+              <label
+                htmlFor="engineering-challenge"
+                className="block text-[13px] font-semibold text-[#161616]"
+              >
                 Engineering Challenge
               </label>
               <textarea
+                id="engineering-challenge"
                 value={rawInput}
-                onChange={(e) => setRawInput(e.target.value)}
+                onChange={(event) => {
+                  setRawInput(event.target.value);
+                  setMode(null);
+                  setError(null);
+                }}
                 placeholder="e.g. What physical alternatives exist to conventional spray cleaning for industrial tanks while cutting water consumption and wash duration?"
                 className="mt-3 h-36 w-full rounded-xl border border-[#d5d5d0] p-4 text-[14px] leading-relaxed text-[#161616] outline-none transition focus:border-[#176b87]"
               />
+
+              {mode === "prepared" ? (
+                <div className="mt-3 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
+                  {DEMO_MODE_LABEL} selected. This path uses fixed data and is not
+                  live web research.
+                </div>
+              ) : null}
+
+              {error ? (
+                <div className="mt-3 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
+                  <span className="font-semibold">
+                    Research could not be started.
+                  </span>{" "}
+                  {error}
+                </div>
+              ) : null}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#f0f0ec] pt-4">
                 <button
@@ -486,211 +204,171 @@ ${selectedCandidates
                   onClick={handleLoadDemo}
                   className="rounded-lg border border-[#e5e5e2] bg-[#f7f7f5] px-3.5 py-2 text-[12px] font-semibold text-[#176b87] transition hover:bg-[#eaf3f6]"
                 >
-                  ⚡ Load Tank Cleaning Demo Challenge
+                  Load Tank Cleaning Demo Challenge
                 </button>
-
                 <button
                   type="button"
-                  disabled={loading}
-                  onClick={handleStartResearch}
+                  disabled={loading || rawInput.trim().length < 12}
+                  onClick={() => void handleStartResearch()}
                   className="rounded-xl bg-[#161616] px-6 py-2.5 text-[14px] font-medium text-white transition hover:bg-[#333] disabled:opacity-50"
                 >
-                  {loading ? "Analyzing..." : "Start Research →"}
+                  {loading
+                    ? "Starting research..."
+                    : mode === "prepared"
+                      ? "Open Prepared Research Brief →"
+                      : "Start Research →"}
                 </button>
               </div>
             </div>
 
-            {/* Guiding Info */}
             <div className="mt-6 grid grid-cols-3 gap-4">
-              <div className="rounded-xl border border-[#e5e5e2] bg-white p-4">
-                <span className="text-[12px] font-bold text-[#161616]">Cross-Industry Transfer</span>
-                <p className="mt-1 text-[12px] text-[#626262]">
-                  Identifies physical mechanisms proven in semiconductors, aerospace, and robotics.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#e5e5e2] bg-white p-4">
-                <span className="text-[12px] font-bold text-[#161616]">Empirical Rigor</span>
-                <p className="mt-1 text-[12px] text-[#626262]">
-                  Filters marketing hype. Every claim is verified with empirical engineering metrics.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#e5e5e2] bg-white p-4">
-                <span className="text-[12px] font-bold text-[#161616]">Transparent Criteria</span>
-                <p className="mt-1 text-[12px] text-[#626262]">
-                  Compares solutions on water, cycle time, maturity (TRL), and equipment retrofit.
-                </p>
-              </div>
+              <GuidanceCard
+                title="Cross-Industry Transfer"
+                text="Identifies physical mechanisms used in adjacent technical domains."
+              />
+              <GuidanceCard
+                title="Evidence Traceability"
+                text="Keeps retrieved claims connected to their source and uncertainty."
+              />
+              <GuidanceCard
+                title="Transparent Criteria"
+                text="Compares solutions on performance, maturity, and retrofit potential."
+              />
             </div>
-          </div>
-        )}
+          </section>
+        ) : null}
 
-        {/* ========================================================= */}
-        {/* STEP 2: STRUCTURED BRIEF                                  */}
-        {/* ========================================================= */}
-        {step === 2 && (
-          <div>
+        {step === 2 ? (
+          <section>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[12px] font-bold tracking-wider uppercase text-[#176b87]">
+                <p className="text-[12px] font-bold uppercase tracking-wider text-[#176b87]">
                   Step 2 · Research Brief
                 </p>
-                <h1 className="mt-1 text-[30px] font-semibold tracking-tight text-[#161616]">
+                <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
                   Structured Engineering Intake
                 </h1>
               </div>
               <button
-                onClick={handleExploreLandscape}
+                type="button"
+                onClick={() => advanceTo(3)}
                 className="rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white transition hover:bg-[#333]"
               >
-                {loading ? "Searching..." : "Explore Technology Landscape →"}
+                Explore Technology Landscape →
               </button>
             </div>
 
             <div className="mt-8 grid grid-cols-12 gap-6">
-              {/* Left Column: Problem Breakdown */}
               <div className="col-span-8 space-y-6">
-                <div className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
-                  <h3 className="text-[13px] font-bold uppercase tracking-wider text-[#8a8a8a]">
-                    Refined Engineering Problem Statement
-                  </h3>
-                  <p className="mt-2 text-[17px] font-medium leading-snug text-[#161616]">
-                    {brief.problem}
+                <Surface>
+                  <SectionLabel>Refined Engineering Problem Statement</SectionLabel>
+                  <p className="mt-2 text-[17px] font-medium leading-snug">
+                    {DEMO_BRIEF.problem}
                   </p>
-
-                  <div className="mt-6 border-t border-[#f0f0ec] pt-5">
-                    <h4 className="text-[12px] font-bold uppercase text-[#8a8a8a]">Goals</h4>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {brief.goals.map((g, i) => (
-                        <span key={i} className="rounded-full bg-[#f0f0ec] px-3 py-1 text-[12px] font-medium text-[#161616]">
-                          ✓ {g}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 border-t border-[#f0f0ec] pt-5">
-                    <h4 className="text-[12px] font-bold uppercase text-[#8a8a8a]">Operational Constraints</h4>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {brief.constraints.map((c, i) => (
-                        <span key={i} className="rounded-full border border-[#e5e5e2] bg-white px-3 py-1 text-[12px] text-[#626262]">
-                          • {c}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 border-t border-[#f0f0ec] pt-5">
-                    <h4 className="text-[12px] font-bold uppercase text-[#8a8a8a]">Explicit Assumptions</h4>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {brief.assumptions.map((a, i) => (
-                        <span key={i} className="rounded-lg bg-[#fff9ea] px-3 py-1.5 text-[12px] text-[#916000]">
-                          ℹ {a}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
-                  <h3 className="text-[13px] font-bold uppercase tracking-wider text-[#8a8a8a]">
-                    Scouting Search Dimensions
-                  </h3>
+                  <BriefList title="Goals" items={DEMO_BRIEF.goals} />
+                  <BriefList
+                    title="Operational Constraints"
+                    items={DEMO_BRIEF.constraints}
+                  />
+                  <BriefList
+                    title="Explicit Assumptions"
+                    items={DEMO_BRIEF.assumptions}
+                    warning
+                  />
+                </Surface>
+                <Surface>
+                  <SectionLabel>Scouting Search Dimensions</SectionLabel>
                   <div className="mt-3 grid grid-cols-2 gap-3">
-                    {brief.search_dimensions.map((dim, i) => (
-                      <div key={i} className="rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-3 text-[13px] font-medium text-[#161616]">
-                        {i + 1}. {dim}
+                    {DEMO_BRIEF.searchDimensions.map((dimension, index) => (
+                      <div
+                        key={dimension}
+                        className="rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-3 text-[13px] font-medium"
+                      >
+                        {index + 1}. {dimension}
                       </div>
                     ))}
                   </div>
-                </div>
+                </Surface>
               </div>
-
-              {/* Right Column: Scopes & Confidence */}
-              <div className="col-span-4 space-y-6">
-                <div className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
-                  <h3 className="text-[13px] font-bold uppercase tracking-wider text-[#8a8a8a]">
-                    Search Boundaries
-                  </h3>
-
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Primary Scope</span>
-                      <p className="mt-1 text-[13px] font-medium text-[#161616]">{brief.primary_scope}</p>
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Adjacent Scope (Cross-Industry)</span>
-                      <p className="mt-1 text-[13px] font-medium text-[#176b87]">{brief.adjacent_scope}</p>
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Evidence Tiers</span>
-                      <p className="mt-1 text-[12px] text-[#626262]">{brief.evidence_types}</p>
-                    </div>
+              <div className="col-span-4">
+                <Surface>
+                  <SectionLabel>Search Boundaries</SectionLabel>
+                  <div className="mt-4 space-y-4 text-[13px]">
+                    <Definition
+                      label="Primary Scope"
+                      value="Industrial cleaning · manufacturing · tank operations"
+                    />
+                    <Definition
+                      label="Adjacent Scope (Cross-Industry)"
+                      value="Precision cleaning, robotics, sensing, and surface science"
+                      accent
+                    />
+                    <Definition
+                      label="Evidence"
+                      value="Illustrative references in prepared mode; retrieved sources in live mode"
+                    />
                   </div>
-
                   <div className="mt-6 rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Intake Confidence</span>
-                      <span className="rounded-full bg-[#edf8f1] px-2 py-0.5 text-[11px] font-bold text-[#23734d]">
-                        {brief.confidence_level}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-[12px] text-[#626262]">{brief.confidence_note}</p>
+                    <SectionLabel>Known Uncertainty</SectionLabel>
+                    <p className="mt-2 text-[12px] text-[#626262]">
+                      {DEMO_BRIEF.unknowns.join("; ")}.
+                    </p>
                   </div>
-                </div>
+                </Surface>
               </div>
             </div>
-          </div>
-        )}
+          </section>
+        ) : null}
 
-        {/* ========================================================= */}
-        {/* STEP 3: TECHNOLOGY LANDSCAPE                              */}
-        {/* ========================================================= */}
-        {step === 3 && (
-          <div>
+        {step === 3 ? (
+          <section>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[12px] font-bold tracking-wider uppercase text-[#176b87]">
+                <p className="text-[12px] font-bold uppercase tracking-wider text-[#176b87]">
                   Step 3 · Technology Discovery
                 </p>
-                <h1 className="mt-1 text-[30px] font-semibold tracking-tight text-[#161616]">
+                <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
                   Candidate Technology Landscape
                 </h1>
               </div>
-
               <button
-                onClick={handleCompare}
+                type="button"
                 disabled={selectedCandidates.length === 0}
+                onClick={() => advanceTo(4)}
                 className="rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white transition hover:bg-[#333] disabled:opacity-50"
               >
                 Compare Selected ({selectedCandidates.length}) →
               </button>
             </div>
 
-            {/* Stats Bar */}
             <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e5e5e2] bg-white px-6 py-4 shadow-sm">
               <div className="flex items-center gap-8">
+                <Stat label="Prepared Candidates" value={DEMO_CANDIDATES.length} />
+                <Stat
+                  label="Source Mode"
+                  value="Illustrative"
+                  accent
+                  compact
+                />
                 <div>
-                  <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Evidences Analyzed</span>
-                  <p className="text-[20px] font-bold text-[#161616]">42</p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Physical Principles</span>
-                  <p className="text-[20px] font-bold text-[#176b87]">8 Discovered</p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Verification Status</span>
-                  <p className="text-[13px] font-medium text-[#23734d]">✓ Real empirical metrics verified</p>
+                  <SectionLabel>Dataset Status</SectionLabel>
+                  <p className="text-[13px] font-medium text-[#916000]">
+                    Prepared demo · not live verification
+                  </p>
                 </div>
               </div>
-
-              {/* Category Filter Tabs */}
               <div className="flex gap-2 rounded-lg bg-[#f0f0ec] p-1">
-                {(["all", "established", "adjacent", "exploratory"] as const).map((tab) => (
+                {(
+                  ["all", "established", "adjacent", "exploratory"] as const
+                ).map((tab) => (
                   <button
                     key={tab}
+                    type="button"
                     onClick={() => setActiveTab(tab)}
                     className={`rounded-md px-3 py-1 text-[12px] font-medium capitalize transition ${
-                      activeTab === tab ? "bg-white text-[#161616] shadow-sm" : "text-[#626262]"
+                      activeTab === tab
+                        ? "bg-white text-[#161616] shadow-sm"
+                        : "text-[#626262]"
                     }`}
                   >
                     {tab}
@@ -699,504 +377,477 @@ ${selectedCandidates
               </div>
             </div>
 
-            {/* Candidates Grid */}
             <div className="mt-6 grid grid-cols-2 gap-4">
-              {filteredCandidates.map((candidate) => (
-                <div
-                  key={candidate.id}
-                  onClick={() => toggleCandidate(candidate.id)}
-                  className={`cursor-pointer rounded-2xl border p-5 transition-all ${
-                    candidate.selected
-                      ? "border-[#176b87] bg-white shadow-md ring-2 ring-[#eaf3f6]"
-                      : "border-[#e5e5e2] bg-white hover:border-[#bbb]"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                          candidate.category === "established"
-                            ? "bg-[#edf8f1] text-[#23734d]"
-                            : candidate.category === "adjacent"
-                            ? "bg-[#eef2ff] text-[#315bd6]"
-                            : "bg-[#fff9ea] text-[#916000]"
-                        }`}>
-                          {candidate.category}
-                        </span>
-                        <h3 className="text-[16px] font-bold text-[#161616]">
-                          {candidate.title}
-                        </h3>
+              {filteredCandidates.map((candidate) => {
+                const selected = selectedIds.includes(candidate.id);
+                return (
+                  <article
+                    key={candidate.id}
+                    onClick={() => toggleCandidate(candidate.id)}
+                    className={`cursor-pointer rounded-2xl border p-5 transition-all ${
+                      selected
+                        ? "border-[#176b87] bg-white shadow-md ring-2 ring-[#eaf3f6]"
+                        : "border-[#e5e5e2] bg-white hover:border-[#bbb]"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <CategoryLabel category={candidate.category} />
+                          <h3 className="text-[16px] font-bold">
+                            {candidate.name}
+                          </h3>
+                        </div>
+                        <p className="mt-2 text-[13px] leading-relaxed text-[#626262]">
+                          {candidate.principle}
+                        </p>
                       </div>
-                      <p className="mt-2 text-[13px] leading-relaxed text-[#626262]">
-                        {candidate.principle}
-                      </p>
+                      <input
+                        aria-label={`Select ${candidate.name}`}
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => undefined}
+                        className="mt-1 h-5 w-5 rounded border-[#d5d5d0] text-[#176b87] focus:ring-[#176b87]"
+                      />
                     </div>
-
-                    <input
-                      type="checkbox"
-                      checked={candidate.selected}
-                      onChange={() => {}}
-                      className="mt-1 h-5 w-5 rounded border-[#d5d5d0] text-[#176b87] focus:ring-[#176b87]"
-                    />
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-1.5">
-                    {candidate.meta.map((m, i) => (
-                      <span key={i} className="rounded-md bg-[#f0f0ec] px-2 py-0.5 text-[11px] text-[#626262]">
-                        {m}
+                    <div className="mt-4 flex flex-wrap gap-1.5">
+                      <Meta>{candidate.maturityLabel}</Meta>
+                      {candidate.benefits.slice(0, 2).map((benefit) => (
+                        <Meta key={benefit}>{benefit}</Meta>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex items-center justify-between border-t border-[#f0f0ec] pt-3 text-[12px]">
+                      <span className="font-semibold">
+                        {candidate.sources.length} illustrative reference
+                        {candidate.sources.length === 1 ? "" : "s"}
                       </span>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-[#f0f0ec] pt-3 text-[12px]">
-                    <span className="font-semibold text-[#161616]">
-                      {candidate.evidence_count} supporting citations
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setModalSource({ title: candidate.title, sources: candidate.sources });
-                      }}
-                      className="font-medium text-[#176b87] hover:underline"
-                    >
-                      View empirical evidence →
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setModalCandidate(candidate);
+                        }}
+                        className="font-medium text-[#176b87] hover:underline"
+                      >
+                        View references →
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </div>
-        )}
+          </section>
+        ) : null}
 
-        {/* ========================================================= */}
-        {/* STEP 4: COMPARISON MATRIX                                */}
-        {/* ========================================================= */}
-        {step === 4 && (
-          <div>
+        {step === 4 ? (
+          <section>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[12px] font-bold tracking-wider uppercase text-[#176b87]">
+                <p className="text-[12px] font-bold uppercase tracking-wider text-[#176b87]">
                   Step 4 · Multi-Criteria Evaluation
                 </p>
-                <h1 className="mt-1 text-[30px] font-semibold tracking-tight text-[#161616]">
+                <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
                   Side-by-Side Engineering Comparison
                 </h1>
               </div>
-
               <button
-                onClick={handleShortlist}
+                type="button"
+                onClick={() => advanceTo(5)}
                 className="rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white transition hover:bg-[#333]"
               >
                 Generate Final Shortlist & Brief →
               </button>
             </div>
-
             <div className="mt-8 overflow-hidden rounded-2xl border border-[#e5e5e2] bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-[#e5e5e2] bg-[#f7f7f5]">
-                      <th className="w-56 p-4 font-bold text-[#161616]">Criteria / Technology</th>
-                      {selectedCandidates.map((c) => (
-                        <th key={c.id} className="p-4 font-bold text-[#161616]">
-                          {c.title}
+                      <th className="w-56 p-4 font-bold">
+                        Criteria / Technology
+                      </th>
+                      {selectedCandidates.map((candidate) => (
+                        <th key={candidate.id} className="p-4 font-bold">
+                          {candidate.name}
                           <span className="block text-[10px] font-normal text-[#8a8a8a]">
-                            {c.category.toUpperCase()}
+                            {candidate.category.toUpperCase()}
                           </span>
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f0f0ec]">
-                    {comparisonRows && comparisonRows.length > 0 ? (
-                      comparisonRows.map((row, rIdx) => (
-                        <tr key={rIdx}>
-                          <td className="p-4 font-semibold text-[#626262]">{row.criterion}</td>
-                          {selectedCandidates.map((c) => {
-                            const cell = row.cells?.find((cl: any) => cl.solution_id === c.id) || {};
-                            return (
-                              <td key={c.id} className="p-4">
-                                {cell.pill && (
-                                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                    cell.class === "high"
-                                      ? "bg-[#edf8f1] text-[#23734d]"
-                                      : cell.class === "medium"
-                                      ? "bg-[#fff9ea] text-[#916000]"
-                                      : "bg-[#f0f0ec] text-[#626262]"
-                                  }`}>
-                                    {cell.pill}
-                                  </span>
-                                )}
-                                {cell.text && (
-                                  <p className="mt-1 text-[12px] text-[#626262]">{cell.text}</p>
-                                )}
-                                {cell.link && (
-                                  <button
-                                    onClick={() => setModalSource({ title: c.title, sources: c.sources })}
-                                    className="mt-1 block text-[11px] text-[#176b87] hover:underline"
-                                  >
-                                    {cell.link}
-                                  </button>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))
-                    ) : (
-                      <>
-                        <tr>
-                          <td className="p-4 font-semibold text-[#626262]">Problem Fit</td>
-                          {selectedCandidates.map((c) => (
-                            <td key={c.id} className="p-4">
-                              <span className="rounded-full bg-[#edf8f1] px-2.5 py-0.5 text-[11px] font-bold text-[#23734d]">
-                                High
-                              </span>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          <td className="p-4 font-semibold text-[#626262]">Primary Performance Gain</td>
-                          {selectedCandidates.map((c) => (
-                            <td key={c.id} className="p-4">
-                              <span className="rounded-full bg-[#edf8f1] px-2.5 py-0.5 text-[11px] font-bold text-[#23734d]">
-                                High (&gt;50%)
-                              </span>
-                              <button
-                                onClick={() => setModalSource({ title: c.title, sources: c.sources })}
-                                className="mt-1 block text-[11px] text-[#176b87] hover:underline"
-                              >
-                                {c.sources.length} supporting papers →
-                              </button>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          <td className="p-4 font-semibold text-[#626262]">Cleaning Cycle Time</td>
-                          {selectedCandidates.map((c) => (
-                            <td key={c.id} className="p-4">
-                              <span className="rounded-full bg-[#edf8f1] px-2.5 py-0.5 text-[11px] font-bold text-[#23734d]">
-                                Fast (&lt;2 min)
-                              </span>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          <td className="p-4 font-semibold text-[#626262]">Fit with Existing Equipment</td>
-                          {selectedCandidates.map((c) => (
-                            <td key={c.id} className="p-4">
-                              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                c.category === "established" ? "bg-[#edf8f1] text-[#23734d]" : "bg-[#fff9ea] text-[#916000]"
-                              }`}>
-                                {c.category === "established" ? "Direct Retrofit" : "Requires Adapter"}
-                              </span>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          <td className="p-4 font-semibold text-[#626262]">Technology Maturity</td>
-                          {selectedCandidates.map((c) => (
-                            <td key={c.id} className="p-4">
-                              <span className="font-semibold text-[#161616]">
-                                {c.category === "established" ? "TRL 8 (Production)" : "TRL 6-7 (Pilot)"}
-                              </span>
-                            </td>
-                          ))}
-                        </tr>
-                        <tr>
-                          <td className="p-4 font-semibold text-[#626262]">Key Physical Uncertainty</td>
-                          {selectedCandidates.map((c) => (
-                            <td key={c.id} className="p-4 text-[12px] text-[#626262]">
-                              {c.id === "within-1" && "Actual savings under specific heavy resin contamination."}
-                              {c.id === "within-2" && "Sensor window fouling in high-turbidity grease rinses."}
-                              {c.category === "adjacent" && "Optics and transducer survivability under aggressive CIP caustic wash."}
-                              {c.category === "exploratory" && "Nanocoating wear under abrasive mechanical slurry action."}
-                            </td>
-                          ))}
-                        </tr>
-                      </>
-                    )}
+                    <ComparisonRow
+                      label="Why relevant"
+                      candidates={selectedCandidates}
+                      value={(candidate) => candidate.relevance}
+                    />
+                    <ComparisonRow
+                      label="Technology maturity"
+                      candidates={selectedCandidates}
+                      value={(candidate) => candidate.maturityLabel}
+                    />
+                    <ComparisonRow
+                      label="Potential benefits"
+                      candidates={selectedCandidates}
+                      value={(candidate) => candidate.benefits.join("; ")}
+                    />
+                    <ComparisonRow
+                      label="Key limitation"
+                      candidates={selectedCandidates}
+                      value={(candidate) => candidate.limitations.join("; ")}
+                    />
+                    <ComparisonRow
+                      label="Evidence state"
+                      candidates={selectedCandidates}
+                      value={() => "Prepared illustrative reference — not verified"}
+                    />
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
-        )}
+          </section>
+        ) : null}
 
-        {/* ========================================================= */}
-        {/* STEP 5: RANKED SHORTLIST & ROADMAP                        */}
-        {/* ========================================================= */}
-        {step === 5 && (
-          <div>
+        {step === 5 ? (
+          <section>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[12px] font-bold tracking-wider uppercase text-[#176b87]">
+                <p className="text-[12px] font-bold uppercase tracking-wider text-[#176b87]">
                   Step 5 · Recommendations & Next Steps
                 </p>
-                <h1 className="mt-1 text-[30px] font-semibold tracking-tight text-[#161616]">
+                <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
                   Shortlisted Technology Actions
                 </h1>
               </div>
-
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setShowExportModal(true)}
-                  className="rounded-xl border border-[#e5e5e2] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#161616] shadow-sm hover:bg-[#f7f7f5]"
+                  className="rounded-xl border border-[#e5e5e2] bg-white px-5 py-2.5 text-[13px] font-semibold shadow-sm hover:bg-[#f7f7f5]"
                 >
-                  📋 View Exportable Markdown Brief
+                  View Exportable Markdown Brief
                 </button>
                 <button
-                  onClick={() => setStep(1)}
+                  type="button"
+                  onClick={() => {
+                    setStep(1);
+                    setMaxStep(1);
+                    setMode(null);
+                    setRawInput("");
+                  }}
                   className="rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white hover:bg-[#333]"
                 >
                   Start New Scout
                 </button>
               </div>
             </div>
-
             <div className="mt-8 space-y-6">
-              {shortlistItems && shortlistItems.length > 0 ? (
-                shortlistItems.map((item, i) => (
-                  <div key={item.id || i} className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="text-[12px] font-bold text-[#176b87]">
-                          RANK #{i + 1} RECOMMENDED CANDIDATE
-                        </span>
-                        <h3 className="mt-1 text-[20px] font-bold text-[#161616]">
-                          {item.title}
-                        </h3>
-                      </div>
-
-                      {item.sources && item.sources.length > 0 && (
-                        <button
-                          onClick={() => setModalSource({ title: item.title, sources: item.sources })}
-                          className="rounded-lg border border-[#e5e5e2] px-3 py-1.5 text-[12px] font-medium text-[#176b87] hover:bg-[#eaf3f6]"
-                        >
-                          {item.sources.length} Verified Sources →
-                        </button>
-                      )}
+              {selectedCandidates.map((candidate, index) => (
+                <article
+                  key={candidate.id}
+                  className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[12px] font-bold text-[#176b87]">
+                        RANK #{index + 1} PREPARED CANDIDATE
+                      </span>
+                      <h3 className="mt-1 text-[20px] font-bold">
+                        {candidate.name}
+                      </h3>
                     </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-6 border-t border-[#f0f0ec] pt-5">
-                      <div>
-                        <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Why Selected</span>
-                        <p className="mt-1 text-[13px] leading-relaxed text-[#161616]">
-                          {item.why_selected}
-                        </p>
-                      </div>
-
-                      <div>
-                        <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Key Caveat / Uncertainty</span>
-                        <p className="mt-1 text-[13px] leading-relaxed text-[#916000]">
-                          {item.main_uncertainty}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 border-t border-[#f0f0ec] pt-4">
-                      <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Immediate Next Engineering Investigations</span>
-                      <ul className="mt-2 space-y-1.5 text-[13px] text-[#161616]">
-                        {item.next_investigations?.map((inv: string, idx: number) => (
-                          <li key={idx} className="flex items-center gap-2">
-                            <span className="text-[#176b87]">▪</span>
-                            {inv}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                selectedCandidates.map((c, i) => (
-                  <div key={c.id} className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="text-[12px] font-bold text-[#176b87]">
-                          RANK #{i + 1} RECOMMENDED CANDIDATE
-                        </span>
-                        <h3 className="mt-1 text-[20px] font-bold text-[#161616]">
-                          {c.title}
-                        </h3>
-                        <p className="mt-1 text-[14px] text-[#626262]">{c.principle}</p>
-                      </div>
-
-                      <button
-                        onClick={() => setModalSource({ title: c.title, sources: c.sources })}
-                        className="rounded-lg border border-[#e5e5e2] px-3 py-1.5 text-[12px] font-medium text-[#176b87] hover:bg-[#eaf3f6]"
-                      >
-                        {c.sources.length} Verified Sources →
-                      </button>
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-6 border-t border-[#f0f0ec] pt-5">
-                      <div>
-                        <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Why Selected</span>
-                        <p className="mt-1 text-[13px] leading-relaxed text-[#161616]">
-                          {c.id === "within-1" &&
-                            "Strong empirical evidence (82% water reduction at 6 bar in Fraunhofer trials), rapid ROI, and seamless retrofit to existing spray mounts."}
-                          {c.id === "within-2" &&
-                            "Eliminates blind over-washing by closing the loop. Standard practice in brewing/dairy, immediately transferable to parts tanks."}
-                          {c.category === "adjacent" &&
-                            "High water efficiency demonstrated in precision electronics; eliminates repetitive high-pressure hydraulic flood cycles."}
-                        </p>
-                      </div>
-
-                      <div>
-                        <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Key Caveat / Uncertainty</span>
-                        <p className="mt-1 text-[13px] leading-relaxed text-[#916000]">
-                          {c.id === "within-1" && "Savings will vary based on whether contamination is viscous grease vs light particulate."}
-                          {c.id === "within-2" && "Requires spare 4-20mA analog inputs on legacy tank PLCs."}
-                          {c.category === "adjacent" && "IP68 washdown rating required for camera or transducer housings."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 border-t border-[#f0f0ec] pt-4">
-                      <span className="text-[11px] font-bold uppercase text-[#8a8a8a]">Immediate Next Engineering Investigations</span>
-                      <ul className="mt-2 space-y-1.5 text-[13px] text-[#161616]">
-                        <li className="flex items-center gap-2">
-                          <span className="text-[#176b87]">▪</span>
-                          Run bench test with target residue sample to establish threshold impingement pressure.
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <span className="text-[#176b87]">▪</span>
-                          Verify existing tank pump flow curves and pipe diameter suitability.
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <span className="text-[#176b87]">▪</span>
-                          Quantify chemical detergent and water utility payback timeline.
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-          </div>
-        )}
-      </main>
-
-      {/* ========================================================= */}
-      {/* EVIDENCE MODAL                                            */}
-      {/* ========================================================= */}
-      {modalSource && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-[720px] overflow-hidden rounded-2xl border border-[#e5e5e2] bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-[#e5e5e2] px-6 py-4">
-              <div>
-                <span className="text-[11px] font-bold uppercase text-[#176b87]">
-                  Traceable Empirical Evidence
-                </span>
-                <h3 className="text-[17px] font-bold text-[#161616]">
-                  {modalSource.title}
-                </h3>
-              </div>
-              <button
-                onClick={() => setModalSource(null)}
-                className="rounded-lg p-1 text-[#8a8a8a] hover:bg-[#f0f0ec] hover:text-[#161616]"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="max-h-[60vh] space-y-4 overflow-y-auto p-6">
-              {modalSource.sources.map((s, idx) => (
-                <div key={idx} className="rounded-xl border border-[#e5e5e2] p-4 text-[13px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full bg-[#f0f0ec] px-2.5 py-0.5 text-[10px] font-bold text-[#626262]">
-                      {s.tier}
-                    </span>
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12px] font-semibold text-[#176b87] hover:underline"
+                    <button
+                      type="button"
+                      onClick={() => setModalCandidate(candidate)}
+                      className="rounded-lg border border-[#e5e5e2] px-3 py-1.5 text-[12px] font-medium text-[#176b87] hover:bg-[#eaf3f6]"
                     >
-                      Open Document ↗
-                    </a>
+                      {candidate.sources.length} Illustrative Reference
+                      {candidate.sources.length === 1 ? "" : "s"} →
+                    </button>
                   </div>
-
-                  <h4 className="mt-2 font-bold text-[#161616]">{s.title}</h4>
-
-                  <div className="mt-2.5 rounded-lg bg-[#edf8f1] p-2.5 text-[12px] font-medium text-[#23734d]">
-                    📊 Verified Metric: {s.metrics}
+                  <div className="mt-5 grid grid-cols-2 gap-6 border-t border-[#f0f0ec] pt-5">
+                    <div>
+                      <SectionLabel>Why Selected</SectionLabel>
+                      <p className="mt-1 text-[13px] leading-relaxed">
+                        {candidate.relevance}
+                      </p>
+                    </div>
+                    <div>
+                      <SectionLabel>Key Caveat / Uncertainty</SectionLabel>
+                      <p className="mt-1 text-[13px] leading-relaxed text-[#916000]">
+                        {candidate.limitations.join("; ")}
+                      </p>
+                    </div>
                   </div>
-
-                  <p className="mt-2 text-[12px] leading-relaxed text-[#626262]">
-                    "{s.snippet}"
-                  </p>
-                </div>
+                  <div className="mt-5 border-t border-[#f0f0ec] pt-4">
+                    <SectionLabel>
+                      Immediate Next Engineering Investigations
+                    </SectionLabel>
+                    <ul className="mt-2 space-y-1.5 text-[13px]">
+                      <li>▪ Validate the mechanism against the actual residue.</li>
+                      <li>▪ Check compatibility with current tank equipment.</li>
+                      <li>▪ Measure resource use in a controlled pilot.</li>
+                    </ul>
+                  </div>
+                </article>
               ))}
             </div>
+          </section>
+        ) : null}
+      </main>
 
-            <div className="border-t border-[#e5e5e2] px-6 py-3 text-right">
-              <button
-                onClick={() => setModalSource(null)}
-                className="rounded-xl bg-[#161616] px-4 py-2 text-[12px] font-medium text-white hover:bg-[#333]"
+      {modalCandidate ? (
+        <Modal title={modalCandidate.name} onClose={() => setModalCandidate(null)}>
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto p-6">
+            {modalCandidate.sources.map((source) => (
+              <article
+                key={source.url}
+                className="rounded-xl border border-[#e5e5e2] p-4 text-[13px]"
               >
-                Done
-              </button>
-            </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="rounded-full bg-[#f0f0ec] px-2.5 py-0.5 text-[10px] font-bold text-[#626262]">
+                    ILLUSTRATIVE REFERENCE
+                  </span>
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] font-semibold text-[#176b87] hover:underline"
+                  >
+                    Open Document ↗
+                  </a>
+                </div>
+                <h4 className="mt-2 font-bold">{source.title}</h4>
+                <p className="mt-1 text-[12px] text-[#8a8a8a]">
+                  {source.publisher}
+                </p>
+                <p className="mt-3 rounded-lg bg-[#fff9ea] p-2.5 text-[12px] text-[#916000]">
+                  {source.note}
+                </p>
+              </article>
+            ))}
           </div>
-        </div>
-      )}
+        </Modal>
+      ) : null}
 
-      {/* ========================================================= */}
-      {/* EXPORT BRIEF MODAL                                        */}
-      {/* ========================================================= */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-[760px] overflow-hidden rounded-2xl border border-[#e5e5e2] bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-[#e5e5e2] px-6 py-4">
-              <div>
-                <span className="text-[11px] font-bold uppercase text-[#176b87]">
-                  ScoutBeyond Briefing Export
-                </span>
-                <h3 className="text-[17px] font-bold text-[#161616]">
-                  Executive Technology Dossier
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="rounded-lg p-1 text-[#8a8a8a] hover:bg-[#f0f0ec] hover:text-[#161616]"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="max-h-[55vh] overflow-y-auto p-6">
-              <pre className="whitespace-pre-wrap rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-4 text-[12px] leading-relaxed text-[#161616] font-mono">
-                {generateMarkdownBrief()}
-              </pre>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-[#e5e5e2] px-6 py-3">
-              <span className="text-[12px] text-[#626262]">
-                Ready to paste into engineering wikis, Notion, or project documents.
-              </span>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCopy}
-                  className="rounded-xl bg-[#176b87] px-4 py-2 text-[12px] font-semibold text-white hover:bg-[#12566c]"
-                >
-                  {copied ? "✓ Copied to Clipboard!" : "Copy Markdown"}
-                </button>
-                <button
-                  onClick={() => setShowExportModal(false)}
-                  className="rounded-xl border border-[#e5e5e2] bg-white px-4 py-2 text-[12px] font-medium text-[#161616] hover:bg-[#f7f7f5]"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+      {showExportModal ? (
+        <Modal
+          title="Executive Technology Dossier"
+          onClose={() => setShowExportModal(false)}
+          wide
+        >
+          <div className="max-h-[55vh] overflow-y-auto p-6">
+            <pre className="whitespace-pre-wrap rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-4 font-mono text-[12px] leading-relaxed">
+              {exportMarkdown}
+            </pre>
           </div>
+          <div className="flex items-center justify-between border-t border-[#e5e5e2] px-6 py-3">
+            <span className="text-[12px] text-[#626262]">
+              Prepared demo export — not live research.
+            </span>
+            <button
+              type="button"
+              onClick={() => void copyExport()}
+              className="rounded-xl bg-[#176b87] px-4 py-2 text-[12px] font-semibold text-white hover:bg-[#12566c]"
+            >
+              {copied ? "Copied to Clipboard" : "Copy Markdown"}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+    </div>
+  );
+}
+
+function PreparedDemoBanner() {
+  return (
+    <div className="mb-6 rounded-xl border border-[#f0d9a8] bg-[#fff9ea] px-5 py-3 text-[13px] text-[#916000]">
+      <span className="font-semibold">{DEMO_MODE_LABEL}.</span> Fixed data for
+      UX walkthroughs; not live web research.
+    </div>
+  );
+}
+
+function GuidanceCard({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-[#e5e5e2] bg-white p-4">
+      <span className="text-[12px] font-bold">{title}</span>
+      <p className="mt-1 text-[12px] text-[#626262]">{text}</p>
+    </div>
+  );
+}
+
+function Surface({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#8a8a8a]">
+      {children}
+    </h3>
+  );
+}
+
+function BriefList({
+  title,
+  items,
+  warning = false,
+}: {
+  title: string;
+  items: string[];
+  warning?: boolean;
+}) {
+  return (
+    <div className="mt-5 border-t border-[#f0f0ec] pt-5">
+      <SectionLabel>{title}</SectionLabel>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span
+            key={item}
+            className={`px-3 py-1 text-[12px] ${
+              warning
+                ? "rounded-lg bg-[#fff9ea] text-[#916000]"
+                : "rounded-full bg-[#f0f0ec] text-[#161616]"
+            }`}
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Definition({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div>
+      <SectionLabel>{label}</SectionLabel>
+      <p className={`mt-1 font-medium ${accent ? "text-[#176b87]" : ""}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent = false,
+  compact = false,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div>
+      <SectionLabel>{label}</SectionLabel>
+      <p
+        className={`${compact ? "text-[16px]" : "text-[20px]"} font-bold ${
+          accent ? "text-[#176b87]" : ""
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function CategoryLabel({ category }: { category: CandidateCategory }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+        category === "established"
+          ? "bg-[#edf8f1] text-[#23734d]"
+          : category === "adjacent"
+            ? "bg-[#eef2ff] text-[#315bd6]"
+            : "bg-[#fff9ea] text-[#916000]"
+      }`}
+    >
+      {category}
+    </span>
+  );
+}
+
+function Meta({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-md bg-[#f0f0ec] px-2 py-0.5 text-[11px] text-[#626262]">
+      {children}
+    </span>
+  );
+}
+
+function ComparisonRow({
+  label,
+  candidates,
+  value,
+}: {
+  label: string;
+  candidates: DemoCandidate[];
+  value: (candidate: DemoCandidate) => string;
+}) {
+  return (
+    <tr>
+      <td className="p-4 font-semibold text-[#626262]">{label}</td>
+      {candidates.map((candidate) => (
+        <td key={candidate.id} className="p-4 text-[12px] text-[#626262]">
+          {value(candidate)}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function Modal({
+  title,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div
+        className={`max-h-[85vh] w-full overflow-hidden rounded-2xl border border-[#e5e5e2] bg-white shadow-xl ${
+          wide ? "max-w-[760px]" : "max-w-[720px]"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-[#e5e5e2] px-6 py-4">
+          <div>
+            <span className="text-[11px] font-bold uppercase text-[#176b87]">
+              ScoutBeyond
+            </span>
+            <h3 className="text-[17px] font-bold">{title}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-[#8a8a8a] hover:bg-[#f0f0ec] hover:text-[#161616]"
+          >
+            Close
+          </button>
         </div>
-      )}
+        {children}
+      </div>
     </div>
   );
 }
