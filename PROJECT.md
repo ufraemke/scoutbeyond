@@ -351,6 +351,8 @@ Converting findings into a consistent schema.
 
 Comparing candidates against criteria.
 
+Category, confidence, applicability, and evidence quality are **deterministic**, not model judgement. The LLM extracts structured facts; application code in `src/lib/research` applies the rules. See `BACKEND_EVALUATION_RULES.md`.
+
 ### Verification
 
 Checking important claims and identifying uncertainty.
