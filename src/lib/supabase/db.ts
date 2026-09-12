@@ -1,21 +1,23 @@
 import { createClient as createBrowserClient } from "./client";
 import { readSupabasePublicEnv } from "./env";
-import type { Candidate, ResearchResult, StructuredProblem, Source } from "@/types/research";
 
 export interface ProblemRecord {
   id: string;
   raw_input?: string;
   statement?: string;
   status: string;
-  data: any;
+  data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
 
 /**
  * Fetch a research session from Supabase by ID.
+ * Legacy helper for the older problems table — prefer live research_runs APIs.
  */
-export async function getProblemSession(sessionId: string): Promise<any | null> {
+export async function getProblemSession(
+  sessionId: string,
+): Promise<Record<string, unknown> | null> {
   const env = readSupabasePublicEnv();
   if (!env.configured) return null;
 
@@ -31,7 +33,8 @@ export async function getProblemSession(sessionId: string): Promise<any | null> 
     return null;
   }
 
-  return data.data || data;
+  const record = data as ProblemRecord;
+  return record.data || record;
 }
 
 /**
@@ -57,9 +60,11 @@ export async function listRecentProblems(limit = 10): Promise<ProblemRecord[]> {
 }
 
 /**
- * Fetch all candidate technologies for a given session.
+ * Fetch candidate technologies for a legacy session.
  */
-export async function getCandidates(sessionId: string): Promise<any[]> {
+export async function getCandidates(
+  sessionId: string,
+): Promise<Record<string, unknown>[]> {
   const env = readSupabasePublicEnv();
   if (!env.configured) return [];
 
@@ -75,13 +80,15 @@ export async function getCandidates(sessionId: string): Promise<any[]> {
     return [];
   }
 
-  return data || [];
+  return (data as Record<string, unknown>[]) || [];
 }
 
 /**
- * Fetch all verified empirical sources for a session.
+ * Fetch sources for a legacy session.
  */
-export async function getSources(sessionId: string): Promise<any[]> {
+export async function getSources(
+  sessionId: string,
+): Promise<Record<string, unknown>[]> {
   const env = readSupabasePublicEnv();
   if (!env.configured) return [];
 
@@ -97,5 +104,5 @@ export async function getSources(sessionId: string): Promise<any[]> {
     return [];
   }
 
-  return data || [];
+  return (data as Record<string, unknown>[]) || [];
 }

@@ -1,4 +1,4 @@
-# Technology Scanner
+# ScoutBeyond
 
 AI-assisted research tool for industrial R&D and engineering teams.
 
@@ -8,84 +8,79 @@ AI-assisted research tool for industrial R&D and engineering teams.
 | --- | --- |
 | `PROJECT.md` | Product scope |
 | `DESIGN.md` | UI guidance |
-| `SEARCH_STRATEGY.md` | **Required** search process (breadth-first, diversified dimensions, two-pass, counter-check) |
-| `BACKEND_EVALUATION_RULES.md` | Deterministic category / confidence / applicability rules |
-| `FIRECRAWL_AND_LLM.md` | **Informational** — Firecrawl vs Gemini vs app roles |
+| `SEARCH_STRATEGY.md` | Required search process |
+| `BACKEND_EVALUATION_RULES.md` | Deterministic evaluation rules |
+| `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` | Live progress requirements |
+| `LIVE_RESEARCH_IMPLEMENTATION.md` | Mandatory live-research build contract |
 | `AGENTS.md` | Agent / contributor conventions |
 
 ## Stack
 
 - Next.js (App Router)
-- React
-- TypeScript
-- Tailwind CSS
-- Vercel
-- Supabase
-- Firecrawl (retrieval)
-- Gemini (problem structuring and evidence extraction)
+- React + TypeScript
+- Supabase (persistence + Realtime)
+- Firecrawl (search + batch scrape webhooks)
+- Gemini (problem structuring + evidence extraction)
+- Deterministic rules in `src/lib/research`
 
-## Research architecture
+## Live research architecture
 
 ```text
-Firecrawl → retrieve
-Gemini → structure + extract facts
-src/lib/research → evaluate
-Frontend → render
+User challenge
+  → POST /api/research/start
+  → Firecrawl Search (diversified queries)
+  → Persist sources in Supabase
+  → Firecrawl Batch Scrape + signed webhook
+  → Per-source Gemini extraction
+  → Deterministic category / confidence / applicability
+  → Supabase Realtime → /research/[runId]
 ```
 
-Search by **function and physical principle**, not only by application name. Breadth first, depth second. See `SEARCH_STRATEGY.md`.
+Prepared tank-cleaning demo data is available explicitly at `/research/demo` and is labeled as a prepared dataset.
 
 ## Getting started
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Environment
-
-Copy `.env.example` to `.env.local` and fill in values as needed:
-
-```bash
-cp .env.example .env.local
-```
-
-Never commit real secrets. GitHub is the source of truth for code, not credentials.
+### Environment
 
 ```env
+GEMINI_API_KEY=
+FIRECRAWL_API_KEY=
+FIRECRAWL_WEBHOOK_SECRET=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-FIRECRAWL_API_KEY=
-GEMINI_API_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-### Supabase
+For local webhook delivery, point `NEXT_PUBLIC_APP_URL` at a public HTTPS tunnel to your Next.js server.
 
-1. Create organization `ScoutBeyond` and project `scoutbeyond` in the [Supabase dashboard](https://supabase.com/dashboard).
-2. Open **Project Settings → API**.
-3. Copy the project URL and `anon` `public` key into `.env.local`.
-4. Add the same two variables in the Vercel project settings for production.
+### Supabase setup
 
-Check the connection at `/api/health/supabase`. A successful response looks like `{ "ok": true, "urlHost": "….supabase.co" }`.
+1. Create the project and copy URL + anon key + service role key into `.env.local`.
+2. Enable **Anonymous sign-ins** in Authentication providers.
+3. Apply `supabase/migrations/20260312220000_live_research.sql` in the SQL editor (or via Supabase CLI).
+4. Confirm Realtime is enabled for `research_runs`, `research_sources`, `research_events`, and `live_candidates`.
 
-### Firecrawl and Gemini
-
-Add `FIRECRAWL_API_KEY` and `GEMINI_API_KEY` when wiring the research pipeline. Firecrawl retrieves sources; Gemini structures problems and extracts evidence; `src/lib/research` applies evaluation rules.
+Health check: `/api/health/supabase`.
 
 ## Scripts
 
-| Command         | Description              |
+| Command | Description |
 | --- | --- |
-| `npm run dev`   | Start local dev server   |
-| `npm run build` | Production build         |
-| `npm run start` | Start production server  |
-| `npm run lint`  | Run ESLint               |
-| `npm run test`  | Run unit tests           |
+| `npm run dev` | Local Next.js server |
+| `npm run build` | Production build |
+| `npm run test` | Unit tests |
+| `npm run lint` | ESLint |
 
-## Team workflow
+## Notes
 
-- GitHub is the source of truth
-- Prefer small feature branches (`feature/...`, `fix/...`)
-- Keep commits coherent and scoped
+- The Flask prototype under `backend/` is deprecated and no longer used by the app.
+- Do not show invented progress percentages or unverified source counts in live mode.

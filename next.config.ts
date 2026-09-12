@@ -1,14 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: "/pyapi/:path*",
-        destination: "http://127.0.0.1:5000/api/:path*",
-      },
-    ];
-  },
+  // Live research runs entirely in Next.js API routes.
+  // The obsolete Flask /pyapi proxy has been removed.
 };
 
 export default nextConfig;
