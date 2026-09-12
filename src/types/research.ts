@@ -6,6 +6,14 @@ export type ResearchStatus = "complete" | "partial" | "error";
 
 export type EvidenceStance = "supports" | "contradicts" | "neutral";
 
+export type EvidenceQuality = "strong" | "moderate" | "weak";
+
+export type ApplicabilityRating = "high" | "medium" | "low" | "uncertain";
+
+export type PurposeFit = "yes" | "partial" | "no";
+
+export type TransferRequirement = "low" | "medium" | "high";
+
 export type SourceType =
   | "research_paper"
   | "patent"
@@ -15,6 +23,44 @@ export type SourceType =
   | "industry_source"
   | "internal"
   | "other";
+
+// --------------------------------------------------
+// DETERMINISTIC EVALUATION INPUTS
+// (LLM extracts these; application code assigns labels)
+// --------------------------------------------------
+
+export type ClassificationInput = {
+  physicalPrincipleRelevant: boolean;
+  samePurpose: PurposeFit;
+  comparableConditions: PurposeFit;
+  industrialUse: boolean;
+  independentApplications: number;
+  transferRequired: TransferRequirement;
+};
+
+export type ConfidenceInput = {
+  evidenceCount: number;
+  independentSourceCount: number;
+  hasStrongTechnicalSource: boolean;
+  directEvidence: boolean;
+  contradictoryEvidence: boolean;
+};
+
+export type ApplicabilityInput = {
+  physicalPrincipleRelevant: boolean;
+  samePurpose: PurposeFit;
+  comparableConditions: PurposeFit;
+  transferRequired: TransferRequirement;
+  unresolvedKeyConditions: boolean;
+};
+
+export type EvidenceQualityInput = {
+  evidenceCount: number;
+  independentSourceCount: number;
+  hasStrongTechnicalSource: boolean;
+  directEvidence: boolean;
+  contradictoryEvidence: boolean;
+};
 
 // --------------------------------------------------
 // INPUT / PROBLEM DEFINITION
@@ -122,6 +168,12 @@ export type Candidate = {
 
   category: CandidateCategory;
 
+  /**
+   * Structured facts used to derive `category`.
+   * Retain for transparency and UI explanations.
+   */
+  classificationEvidence?: ClassificationInput;
+
   summary: string;
 
   /**
@@ -174,7 +226,7 @@ export type ApplicationExample = {
 };
 
 export type ApplicabilityAssessment = {
-  rating: "high" | "medium" | "low" | "uncertain";
+  rating: ApplicabilityRating;
 
   rationale: string;
 

@@ -10,8 +10,22 @@ Before making substantial changes, read:
 2. `DESIGN.md`
 3. relevant existing code
 4. relevant type definitions / interfaces
+5. `BACKEND_EVALUATION_RULES.md` when working on research, scoring, candidate structuring, or LLM prompts
+6. `SEARCH_STRATEGY.md` when working on research, retrieval, or query generation
 
 Do not redesign the product or architecture unless the task explicitly requires it.
+
+`FIRECRAWL_AND_LLM.md` is informational only (Firecrawl vs Gemini vs app roles). It is not required reading.
+
+### Search strategy (hard)
+
+Follow `SEARCH_STRATEGY.md`: diversified search dimensions (direct, physical principle, adjacent, cross-industry, emerging). Do **not** ask the LLM for an undifferentiated list of queries. Search by function and physical principle, not only application name. Breadth first, depth second.
+
+### Evaluation rules (hard)
+
+The LLM extracts structured facts. Deterministic code in `src/lib/research` assigns category, confidence, applicability, and evidence quality.
+
+Do **not** ask the model whether a candidate is Established, Adjacent, or Exploratory. Do **not** invent parallel classification logic in the UI or prompts.
 
 ---
 
@@ -216,7 +230,8 @@ Example:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-OPENAI_API_KEY=
+FIRECRAWL_API_KEY=
+GEMINI_API_KEY=
 ```
 
 Do not put real values in `.env.example`.
