@@ -1,4 +1,4 @@
-# Technology Scanner
+# ScoutBeyond
 
 ## 1. Purpose
 
