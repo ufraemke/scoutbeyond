@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/layout/app-header";
+import { EditableResearchBrief } from "@/components/research/editable-research-brief";
 import {
   DEMO_BRIEF,
   DEMO_CANDIDATES,
@@ -11,18 +12,26 @@ import {
   type DemoCandidate,
 } from "@/data/demo/tank-cleaning";
 import { ensureAnonymousSession } from "@/lib/supabase/anonymous";
-import type { CandidateCategory } from "@/types";
+import type { CandidateCategory, StructuredProblem } from "@/types";
 
 type ResearchMode = "live" | "prepared" | null;
 type CandidateFilter = "all" | CandidateCategory;
+type PendingAction = "refining" | "starting" | null;
+type ReflectionMode = "gemini" | "fallback";
 
 export default function Home() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [maxStep, setMaxStep] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [rawInput, setRawInput] = useState("");
   const [mode, setMode] = useState<ResearchMode>(null);
+  const [liveBrief, setLiveBrief] = useState<StructuredProblem | null>(null);
+  const [reflectionMode, setReflectionMode] =
+    useState<ReflectionMode | null>(null);
+  const [reflectionWarning, setReflectionWarning] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CandidateFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([
@@ -51,6 +60,7 @@ export default function Home() {
 
   function goToStep(nextStep: number) {
     if (nextStep <= maxStep) {
+      setError(null);
       setStep(nextStep);
     }
   }
@@ -61,27 +71,85 @@ export default function Home() {
   }
 
   function handleLoadDemo() {
+    setStep(1);
+    setMaxStep(1);
     setRawInput(DEMO_CHALLENGE);
     setMode("prepared");
+    setLiveBrief(null);
+    setReflectionMode(null);
+    setReflectionWarning(null);
     setError(null);
   }
 
-  async function handleStartResearch() {
-    setLoading(true);
+  async function handleReviewBrief() {
+    setPendingAction("refining");
     setError(null);
 
     if (mode === "prepared") {
-      setLoading(false);
+      setPendingAction(null);
       advanceTo(2);
       return;
     }
 
     try {
       await ensureAnonymousSession();
-      const response = await fetch("/api/research/start", {
+      const response = await fetch("/api/research/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ challenge: rawInput.trim() }),
+      });
+      const json = (await response.json()) as {
+        ok: boolean;
+        problem?: StructuredProblem;
+        generationMode?: ReflectionMode;
+        warning?: string;
+        message?: string;
+      };
+      if (!response.ok || !json.ok || !json.problem || !json.generationMode) {
+        throw new Error(
+          json.message ||
+            "The research brief could not be generated. Please try again.",
+        );
+      }
+      setLiveBrief(json.problem);
+      setReflectionMode(json.generationMode);
+      setReflectionWarning(json.warning ?? null);
+      setMode("live");
+      advanceTo(2);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The research brief could not be generated.",
+      );
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleConfirmResearch() {
+    setError(null);
+
+    if (mode === "prepared") {
+      advanceTo(3);
+      return;
+    }
+    if (!liveBrief) {
+      setError("Review the research brief before starting live research.");
+      return;
+    }
+
+    setPendingAction("starting");
+    try {
+      await ensureAnonymousSession();
+      const structuredProblem = normalizeStructuredProblem(liveBrief);
+      const response = await fetch("/api/research/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge: rawInput.trim(),
+          structuredProblem,
+        }),
       });
       const json = (await response.json()) as {
         ok: boolean;
@@ -101,7 +169,7 @@ export default function Home() {
           ? caught.message
           : "Research could not be started.",
       );
-      setLoading(false);
+      setPendingAction(null);
     }
   }
 
@@ -176,7 +244,11 @@ ${selectedCandidates
                 onChange={(event) => {
                   setRawInput(event.target.value);
                   setMode(null);
+                  setLiveBrief(null);
+                  setReflectionMode(null);
+                  setReflectionWarning(null);
                   setError(null);
+                  setMaxStep(1);
                 }}
                 placeholder="e.g. What physical alternatives exist to conventional spray cleaning for industrial tanks while cutting water consumption and wash duration?"
                 className="mt-3 h-36 w-full rounded-xl border border-[#d5d5d0] p-4 text-[14px] leading-relaxed text-[#161616] outline-none transition focus:border-[#176b87]"
@@ -192,7 +264,7 @@ ${selectedCandidates
               {error ? (
                 <div className="mt-3 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
                   <span className="font-semibold">
-                    Research could not be started.
+                    Brief could not be prepared.
                   </span>{" "}
                   {error}
                 </div>
@@ -202,22 +274,41 @@ ${selectedCandidates
                 <button
                   type="button"
                   onClick={handleLoadDemo}
-                  className="rounded-lg border border-[#e5e5e2] bg-[#f7f7f5] px-3.5 py-2 text-[12px] font-semibold text-[#176b87] transition hover:bg-[#eaf3f6]"
+                  disabled={pendingAction !== null}
+                  className="cursor-pointer rounded-lg border border-[#e5e5e2] bg-[#f7f7f5] px-3.5 py-2 text-[12px] font-semibold text-[#176b87] transition hover:border-[#176b87] hover:bg-[#eaf3f6] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176b87] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Load Tank Cleaning Demo Challenge
                 </button>
-                <button
-                  type="button"
-                  disabled={loading || rawInput.trim().length < 12}
-                  onClick={() => void handleStartResearch()}
-                  className="rounded-xl bg-[#161616] px-6 py-2.5 text-[14px] font-medium text-white transition hover:bg-[#333] disabled:opacity-50"
-                >
-                  {loading
-                    ? "Starting research..."
-                    : mode === "prepared"
-                      ? "Open Prepared Research Brief →"
-                      : "Start Research →"}
-                </button>
+                <div className="text-right">
+                  <button
+                    type="button"
+                    disabled={
+                      pendingAction !== null || rawInput.trim().length < 12
+                    }
+                    aria-busy={pendingAction === "refining"}
+                    onClick={() => void handleReviewBrief()}
+                    className="cursor-pointer rounded-xl bg-[#161616] px-6 py-2.5 text-[14px] font-medium text-white transition hover:bg-[#333] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176b87] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0"
+                  >
+                    <span className="flex items-center gap-2">
+                      {pendingAction === "refining" ? <LoadingSpinner /> : null}
+                      {pendingAction === "refining"
+                        ? "Reflecting your request..."
+                        : mode === "prepared"
+                          ? "Open Prepared Research Brief →"
+                          : "Review Research Brief →"}
+                    </span>
+                  </button>
+                  {rawInput.trim().length < 12 ? (
+                    <p className="mt-1.5 text-[11px] text-[#8a8a8a]">
+                      Enter at least 12 characters to continue.
+                    </p>
+                  ) : pendingAction === "refining" ? (
+                    <p className="mt-1.5 text-[11px] text-[#626262]">
+                      Gemini is structuring the problem. No web search has
+                      started yet.
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -246,77 +337,156 @@ ${selectedCandidates
                   Step 2 · Research Brief
                 </p>
                 <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
-                  Structured Engineering Intake
+                  Review the Search Request
                 </h1>
+                <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[#626262]">
+                  {mode === "prepared"
+                    ? "Review the prepared brief before opening the illustrative landscape."
+                    : "Gemini translated your challenge into a structured brief. Correct anything that should influence the search before Firecrawl starts."}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => advanceTo(3)}
-                className="rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white transition hover:bg-[#333]"
-              >
-                Explore Technology Landscape →
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={pendingAction !== null}
+                  onClick={() => goToStep(1)}
+                  className="cursor-pointer rounded-xl border border-[#d5d5d0] bg-white px-4 py-2.5 text-[13px] font-medium text-[#161616] transition hover:border-[#8a8a8a] hover:bg-[#f7f7f5] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176b87] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Back to Problem
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    pendingAction !== null ||
+                    (mode === "live" && !isStructuredProblemReady(liveBrief))
+                  }
+                  aria-busy={pendingAction === "starting"}
+                  onClick={() => void handleConfirmResearch()}
+                  className="cursor-pointer rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white transition hover:bg-[#333] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176b87] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0"
+                >
+                  <span className="flex items-center gap-2">
+                    {pendingAction === "starting" ? <LoadingSpinner /> : null}
+                    {pendingAction === "starting"
+                      ? "Starting live research..."
+                      : mode === "prepared"
+                        ? "Open Prepared Landscape →"
+                        : "Confirm & Start Live Research →"}
+                  </span>
+                </button>
+              </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-12 gap-6">
-              <div className="col-span-8 space-y-6">
-                <Surface>
-                  <SectionLabel>Refined Engineering Problem Statement</SectionLabel>
-                  <p className="mt-2 text-[17px] font-medium leading-snug">
-                    {DEMO_BRIEF.problem}
-                  </p>
-                  <BriefList title="Goals" items={DEMO_BRIEF.goals} />
-                  <BriefList
-                    title="Operational Constraints"
-                    items={DEMO_BRIEF.constraints}
-                  />
-                  <BriefList
-                    title="Explicit Assumptions"
-                    items={DEMO_BRIEF.assumptions}
-                    warning
-                  />
-                </Surface>
-                <Surface>
-                  <SectionLabel>Scouting Search Dimensions</SectionLabel>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    {DEMO_BRIEF.searchDimensions.map((dimension, index) => (
-                      <div
-                        key={dimension}
-                        className="rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-3 text-[13px] font-medium"
-                      >
-                        {index + 1}. {dimension}
-                      </div>
-                    ))}
-                  </div>
-                </Surface>
+            {pendingAction === "starting" ? (
+              <div
+                aria-live="polite"
+                className="mt-5 rounded-xl border border-[#c9dfe7] bg-[#eef6f8] px-4 py-3 text-[13px] text-[#12566c]"
+              >
+                Generating diversified queries and finding initial sources can
+                take up to 60 seconds. Keep this tab open.
               </div>
-              <div className="col-span-4">
-                <Surface>
-                  <SectionLabel>Search Boundaries</SectionLabel>
-                  <div className="mt-4 space-y-4 text-[13px]">
-                    <Definition
-                      label="Primary Scope"
-                      value="Industrial cleaning · manufacturing · tank operations"
-                    />
-                    <Definition
-                      label="Adjacent Scope (Cross-Industry)"
-                      value="Precision cleaning, robotics, sensing, and surface science"
-                      accent
-                    />
-                    <Definition
-                      label="Evidence"
-                      value="Illustrative references in prepared mode; retrieved sources in live mode"
-                    />
-                  </div>
-                  <div className="mt-6 rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-4">
-                    <SectionLabel>Known Uncertainty</SectionLabel>
-                    <p className="mt-2 text-[12px] text-[#626262]">
-                      {DEMO_BRIEF.unknowns.join("; ")}.
+            ) : null}
+
+            {reflectionMode ? (
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-[12px] text-[#626262]">
+                <span className="font-semibold text-[#161616]">
+                  Brief source:
+                </span>
+                <span className="rounded-md border border-[#e5e5e2] bg-white px-2 py-1">
+                  {reflectionMode === "gemini"
+                    ? "Gemini reflection"
+                    : "Local fallback"}
+                </span>
+              </div>
+            ) : null}
+
+            {reflectionWarning ? (
+              <div className="mt-3 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
+                {reflectionWarning}
+              </div>
+            ) : null}
+
+            {error ? (
+              <div
+                role="alert"
+                className="mt-3 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]"
+              >
+                <span className="font-semibold">
+                  Research could not be started.
+                </span>{" "}
+                {error}
+              </div>
+            ) : null}
+
+            {mode === "live" && liveBrief ? (
+              <div className="mt-8">
+                <EditableResearchBrief
+                  value={liveBrief}
+                  onChange={setLiveBrief}
+                />
+              </div>
+            ) : (
+              <div className="mt-8 grid grid-cols-12 gap-6">
+                <div className="col-span-8 space-y-6">
+                  <Surface>
+                    <SectionLabel>
+                      Refined Engineering Problem Statement
+                    </SectionLabel>
+                    <p className="mt-2 text-[17px] font-medium leading-snug">
+                      {DEMO_BRIEF.problem}
                     </p>
-                  </div>
-                </Surface>
+                    <BriefList title="Goals" items={DEMO_BRIEF.goals} />
+                    <BriefList
+                      title="Operational Constraints"
+                      items={DEMO_BRIEF.constraints}
+                    />
+                    <BriefList
+                      title="Explicit Assumptions"
+                      items={DEMO_BRIEF.assumptions}
+                      warning
+                    />
+                  </Surface>
+                  <Surface>
+                    <SectionLabel>Scouting Search Dimensions</SectionLabel>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      {DEMO_BRIEF.searchDimensions.map((dimension, index) => (
+                        <div
+                          key={dimension}
+                          className="rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-3 text-[13px] font-medium"
+                        >
+                          {index + 1}. {dimension}
+                        </div>
+                      ))}
+                    </div>
+                  </Surface>
+                </div>
+                <div className="col-span-4">
+                  <Surface>
+                    <SectionLabel>Search Boundaries</SectionLabel>
+                    <div className="mt-4 space-y-4 text-[13px]">
+                      <Definition
+                        label="Primary Scope"
+                        value="Industrial cleaning · manufacturing · tank operations"
+                      />
+                      <Definition
+                        label="Adjacent Scope (Cross-Industry)"
+                        value="Precision cleaning, robotics, sensing, and surface science"
+                        accent
+                      />
+                      <Definition
+                        label="Evidence"
+                        value="Illustrative references in prepared mode; retrieved sources in live mode"
+                      />
+                    </div>
+                    <div className="mt-6 rounded-xl border border-[#e5e5e2] bg-[#f7f7f5] p-4">
+                      <SectionLabel>Known Uncertainty</SectionLabel>
+                      <p className="mt-2 text-[12px] text-[#626262]">
+                        {DEMO_BRIEF.unknowns.join("; ")}.
+                      </p>
+                    </div>
+                  </Surface>
+                </div>
               </div>
-            </div>
+            )}
           </section>
         ) : null}
 
@@ -657,6 +827,58 @@ ${selectedCandidates
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+function normalizeStructuredProblem(
+  problem: StructuredProblem,
+): StructuredProblem {
+  const cleanStrings = (items: string[]) =>
+    items.map((item) => item.trim()).filter(Boolean);
+
+  return {
+    ...problem,
+    statement: problem.statement.trim(),
+    currentSolution: problem.currentSolution?.trim() || undefined,
+    goals: cleanStrings(problem.goals),
+    constraints: problem.constraints
+      .map((constraint) => ({
+        ...constraint,
+        description: constraint.description.trim(),
+      }))
+      .filter((constraint) => constraint.description),
+    assumptions: problem.assumptions
+      .map((assumption) => ({
+        ...assumption,
+        description: assumption.description.trim(),
+      }))
+      .filter((assumption) => assumption.description),
+    unknowns: cleanStrings(problem.unknowns),
+    searchDimensions: problem.searchDimensions
+      .map((dimension) => ({
+        ...dimension,
+        name: dimension.name.trim(),
+        description: dimension.description?.trim() || undefined,
+      }))
+      .filter((dimension) => dimension.name),
+  };
+}
+
+function isStructuredProblemReady(problem: StructuredProblem | null) {
+  if (!problem) return false;
+  const normalized = normalizeStructuredProblem(problem);
+  return (
+    normalized.statement.length >= 12 &&
+    normalized.searchDimensions.length >= 1
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
+    />
   );
 }
 

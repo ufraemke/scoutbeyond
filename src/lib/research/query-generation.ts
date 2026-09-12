@@ -1,6 +1,5 @@
 import "server-only";
 
-import { z } from "zod";
 import type { DiversifiedSearchQuery, StructuredProblem } from "@/types";
 import { generateJson } from "@/lib/gemini/client";
 import {
@@ -9,42 +8,17 @@ import {
   structureProblemFromChallenge,
   validateQueryDiversity,
 } from "./search";
+import { StructuredProblemSchema } from "./schemas";
 
-const StructuredProblemSchema = z.object({
-  statement: z.string().min(8),
-  goals: z.array(z.string()).default([]),
-  constraints: z
-    .array(
-      z.object({
-        id: z.string(),
-        description: z.string(),
-        importance: z.enum(["must", "should"]).optional(),
-      }),
-    )
-    .default([]),
-  assumptions: z
-    .array(
-      z.object({
-        id: z.string(),
-        description: z.string(),
-        origin: z.enum(["user", "ai"]),
-        status: z.enum(["confirmed", "unconfirmed", "rejected"]),
-      }),
-    )
-    .default([]),
-  unknowns: z.array(z.string()).default([]),
-  searchDimensions: z
-    .array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        description: z.string().optional(),
-      }),
-    )
-    .default([]),
-});
+export type ProblemReflection = {
+  problem: StructuredProblem;
+  generationMode: "gemini" | "fallback";
+  warning?: string;
+};
 
-export async function structureProblem(challenge: string): Promise<StructuredProblem> {
+export async function reflectProblem(
+  challenge: string,
+): Promise<ProblemReflection> {
   try {
     const prompt = `You are structuring an industrial physical-technology research problem.
 Challenge: ${challenge}
@@ -52,6 +26,7 @@ Challenge: ${challenge}
 Return JSON only with:
 {
   "statement": "one clear engineering problem statement",
+  "currentSolution": "current approach if the user stated one; otherwise omit this field",
   "goals": ["..."],
   "constraints": [{"id":"c1","description":"...","importance":"must"}],
   "assumptions": [{"id":"a1","description":"...","origin":"ai","status":"unconfirmed"}],
@@ -68,10 +43,18 @@ Return JSON only with:
 Scope: physical engineering only. Exclude software-only and business-model solutions.`;
 
     const raw = await generateJson(prompt);
-    const parsed = StructuredProblemSchema.parse(raw);
-    return parsed;
-  } catch {
-    return structureProblemFromChallenge(challenge);
+    return {
+      problem: StructuredProblemSchema.parse(raw),
+      generationMode: "gemini",
+    };
+  } catch (error) {
+    console.error("[research reflection] Gemini unavailable, using fallback", error);
+    return {
+      problem: structureProblemFromChallenge(challenge),
+      generationMode: "fallback",
+      warning:
+        "Gemini could not generate the reflection. A basic structured brief was created locally for review.",
+    };
   }
 }
 
@@ -83,6 +66,11 @@ export async function generateDiversifiedQueries(
 Problem: ${problem.statement}
 Goals: ${JSON.stringify(problem.goals)}
 Constraints: ${JSON.stringify(problem.constraints)}
+Confirmed or unconfirmed assumptions: ${JSON.stringify(
+      problem.assumptions.filter((assumption) => assumption.status !== "rejected"),
+    )}
+Known unknowns: ${JSON.stringify(problem.unknowns)}
+User-reviewed search dimensions: ${JSON.stringify(problem.searchDimensions)}
 
 Hard rules:
 - Do NOT return an undifferentiated list of similar queries.
