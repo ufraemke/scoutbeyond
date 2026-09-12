@@ -10,8 +10,48 @@ Before making substantial changes, read:
 2. `DESIGN.md`
 3. relevant existing code
 4. relevant type definitions / interfaces
+5. `BACKEND_EVALUATION_RULES.md` when working on research, scoring, candidate structuring, or LLM prompts
+6. `SEARCH_STRATEGY.md` when working on research, retrieval, or query generation
+7. `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` when working on live research, progress UI, Firecrawl webhooks, or Realtime updates
+8. `LIVE_RESEARCH_IMPLEMENTATION.md` when implementing live research, progress UI, Firecrawl webhooks, Realtime, or research orchestration
 
 Do not redesign the product or architecture unless the task explicitly requires it.
+
+`FIRECRAWL_AND_LLM.md` is informational only (Firecrawl vs Gemini vs app roles). It is not required reading.
+
+### Search strategy (hard)
+
+Follow `SEARCH_STRATEGY.md`: diversified search dimensions (direct, physical principle, adjacent, cross-industry, emerging). Do **not** ask the LLM for an undifferentiated list of queries. Search by function and physical principle, not only application name. Breadth first, depth second.
+
+### Evaluation rules (hard)
+
+The LLM extracts structured facts. Deterministic code in `src/lib/research` assigns category, confidence, applicability, and evidence quality.
+
+Do **not** ask the model whether a candidate is Established, Adjacent, or Exploratory. Do **not** invent parallel classification logic in the UI or prompts.
+
+### Live research progress (hard)
+
+Follow `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` for requirements and `LIVE_RESEARCH_IMPLEMENTATION.md` for the mandatory build contract.
+
+Live progress must come from real backend events persisted in Supabase, not mocked timers or invented messages.
+
+Canonical path:
+
+```text
+Firecrawl Search → Batch Scrape → signed webhook → per-source analysis → Supabase Realtime → UI
+```
+
+Do **not**:
+
+- drive research phases with `setTimeout` or hardcoded progress sequences,
+- invent source counts, candidate counts, or percentage completion,
+- show fake “currently reviewing” titles that are not tied to stored sources,
+- block the Firecrawl webhook response on slow LLM analysis,
+- invent an alternate live-research architecture that bypasses webhooks + Realtime.
+
+Animations are allowed. Every displayed phase, counter, source, and candidate must map to persisted run state.
+
+If the UI can look complete without Firecrawl webhooks updating Supabase, the implementation is wrong.
 
 ---
 
@@ -216,7 +256,8 @@ Example:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-OPENAI_API_KEY=
+FIRECRAWL_API_KEY=
+GEMINI_API_KEY=
 ```
 
 Do not put real values in `.env.example`.

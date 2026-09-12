@@ -167,6 +167,14 @@ If information is missing, the system may proceed using explicitly stated assump
 
 The system searches for potentially relevant physical technologies.
 
+Live research follows `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` and the mandatory build contract in `LIVE_RESEARCH_IMPLEMENTATION.md`:
+
+```text
+Firecrawl Search → Batch Scrape + webhooks → per-source analysis → Realtime UI
+```
+
+Progress shown to the user must reflect persisted source and candidate state. Do not fake phases, counts, or completion percentages.
+
 Research may combine:
 
 - live web research,
@@ -350,6 +358,8 @@ Converting findings into a consistent schema.
 ### Evaluation
 
 Comparing candidates against criteria.
+
+Category, confidence, applicability, and evidence quality are **deterministic**, not model judgement. The LLM extracts structured facts; application code in `src/lib/research` applies the rules. See `BACKEND_EVALUATION_RULES.md`.
 
 ### Verification
 

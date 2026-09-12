@@ -1,0 +1,17 @@
+---
+description: Deterministic research evaluation — LLM extracts facts; code assigns category/confidence
+globs: src/lib/research/**,src/types/**,src/app/api/**
+alwaysApply: false
+---
+
+# Research evaluation
+
+Follow `BACKEND_EVALUATION_RULES.md`.
+
+Hard rules:
+
+- The LLM extracts structured facts only (purpose, conditions, industrial use, transfer need, evidence counts).
+- Assign `category`, `confidence`, `applicability`, and evidence quality via `src/lib/research` — never by asking the model “Established / Adjacent / Exploratory?”.
+- Do not invent parallel classification in UI or prompts.
+- Reuse `@/types`; retain classification inputs (e.g. `classificationEvidence`) alongside outputs.
+- Validate LLM output with schemas before applying rules.

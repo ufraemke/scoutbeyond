@@ -405,25 +405,26 @@ The research state should communicate that the system is doing structured work.
 
 Avoid fake terminal output.
 
-Prefer something like:
+Live progress must follow `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md`.
+
+Every visible phase, counter, source title, and candidate must come from persisted backend state (Supabase), not timers or invented sequences.
+
+Prefer factual status such as:
 
 ```text
-Researching technical approaches
+Searching the web...
 
-✓ Understanding the challenge
-✓ Searching established technologies
-● Exploring adjacent industries
-○ Checking emerging approaches
-○ Comparing evidence
+24 potentially relevant sources found.
+
+Reviewing sources
+11 / 24
+
+7 potential solutions identified so far
 ```
 
-A subtle animated progress indicator is sufficient.
+Optional checklist-style steps are allowed only when each step maps 1:1 to a real `research_runs.status` transition.
 
-Possible supporting text:
-
-```text
-Exploring applications outside conventional tank-cleaning systems…
-```
+A subtle animated progress indicator is fine. The underlying numbers and labels must be real.
 
 Keep this concise.
 
