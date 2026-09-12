@@ -1,8 +1,8 @@
-# ScoutBeyond
+# ScooutBeyond
 
 ## 1. Purpose
 
-Technology Scanner is an AI-assisted research tool for industrial R&D and engineering teams.
+ScooutBeyond is an AI-assisted research tool for industrial R&D and engineering teams.
 
 It helps engineers systematically identify technical solution approaches beyond their immediate industry, compare them using transparent criteria, and trace findings back to sources.
 
@@ -25,10 +25,18 @@ Primary users are:
 
 > R&D and engineering teams in mid-sized industrial companies with substantial in-house development but no dedicated technology scouting function.
 
-Specified Industry:
+Primary target industries:
 
-- Mechanical Equipment 
-
+- mechanical equipment and industrial machinery,
+- automotive and component manufacturing,
+- metalworking, machining, and surface treatment,
+- industrial parts washing and precision cleaning,
+- aerospace and industrial equipment manufacturing,
+- electronics and semiconductor manufacturing,
+- packaging, paper, plastics, and textiles,
+- chemicals, coatings, and process manufacturing,
+- utilities, wastewater, and water-treatment operations,
+- food and beverage processing, when the challenge concerns equipment, cleaning systems, or process control.
 
 Typical users:
 
@@ -45,6 +53,14 @@ Typical company context:
 - limited dedicated technology intelligence resources,
 - desktop-centric workflow,
 - users comfortable with Excel but not necessarily databases, APIs, or coding.
+
+### 2.1 Solution Scope and Exclusions
+
+**Scope:** The system scouts physical engineering solutions and technologies for industrial operations. Relevant solutions must involve a physical system, mechanical principle, material, equipment, manufacturing process, physical sensing or measurement method, automation, robotics, or process-control mechanism.
+
+The initial focus is industrial cleaning and water-intensive manufacturing. The system may search adjacent and cross-industry domains—such as quality inspection, machine vision, robotics, sensor systems, process automation, materials engineering, and wastewater treatment—to identify transferable physical solutions. Industry transferability is the purpose of the search; it is not a reason to include unrelated domain solutions.
+
+**Exclude:** pharmaceutical or drug discovery; food, chemical, or material formulation; software-only solutions; generic analytics without a physical sensing or control component; business-model innovations; marketing solutions; purely organizational interventions; and other non-physical solutions.
 
 ---
 
@@ -66,7 +82,7 @@ Engineers need a way to explore broadly without losing technical rigor.
 
 ## 4. Value Proposition
 
-Technology Scanner provides:
+ScooutBeyond provides:
 
 - guided technical research,
 - cross-industry solution discovery,
@@ -91,7 +107,7 @@ Primary hackathon demo:
 
 Research question:
 
-> What alternatives or complementary technologies exist to conventional spray cleaning for cleaning the interior of industrial tanks?
+> What physical alternatives or complementary technologies exist to conventional spray cleaning for cleaning the interior of industrial tanks?
 
 The system should identify solutions from:
 
@@ -113,7 +129,7 @@ Examples of evaluation dimensions:
 - CAPEX,
 - retrofit potential.
 
-The exact candidate technologies may come from live research, prepared datasets, or a combination of both.
+The exact candidate technologies may come from live research, prepared datasets, or a combination of both. Candidates must meet the physical-engineering scope in Section 2.1.
 
 ---
 
@@ -149,7 +165,7 @@ If information is missing, the system may proceed using explicitly stated assump
 
 ### Step 3 — Research
 
-The system searches for potentially relevant technologies.
+The system searches for potentially relevant physical technologies.
 
 Research may combine:
 
@@ -206,7 +222,7 @@ The user receives a structured landscape of candidate solutions.
 The primary visual format is a simple three-column landscape:
 
 | Established | Adjacent | Exploratory |
-|---|---|---|
+| --- | --- | --- |
 | proven industrial approaches | technologies proven elsewhere | emerging / unconventional approaches |
 
 Users can inspect individual candidates in more detail.
@@ -220,7 +236,7 @@ Users can inspect individual candidates in more detail.
 - working web application,
 - technical problem input,
 - research workflow,
-- candidate generation,
+- candidate generation constrained to physical engineering solutions,
 - Established / Adjacent / Exploratory clustering,
 - structured candidate cards,
 - scoring or prioritization,
@@ -325,7 +341,7 @@ Finding potentially relevant information.
 
 ### Analysis
 
-Understanding relevance to the user's technical problem.
+Understanding relevance to the user's technical problem and validating physical-engineering scope.
 
 ### Structuring
 
@@ -359,6 +375,8 @@ type Candidate = {
   id: string
   name: string
   category: "established" | "adjacent" | "exploratory"
+  industries: string[]
+  physicalMechanisms: string[]
 
   summary: string
   relevance: string
@@ -410,7 +428,7 @@ The system should first create a broad technology landscape, then allow deeper i
 
 ### Cross-industry discovery
 
-Finding technologies outside the user's immediate sector is a core differentiator.
+Finding transferable physical technologies outside the user's immediate sector is a core differentiator.
 
 ### Low interaction cost
 
@@ -453,7 +471,7 @@ The prototype is successful if a user can:
 
 1. enter the tank-cleaning challenge,
 2. start the research,
-3. see credible candidate technologies,
+3. see credible physical-engineering candidate technologies,
 4. understand why they were selected,
 5. distinguish Established / Adjacent / Exploratory solutions,
 6. compare candidates,
