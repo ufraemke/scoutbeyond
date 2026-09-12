@@ -86,8 +86,11 @@ export async function startResearch(input: {
       return run;
     }
 
-    await startInitialBatchScrape(run);
-    return (await updateResearchRun(run.id, {})) as ResearchRunRecord;
+    const scrape = await startInitialBatchScrape(run);
+    if (!scrape) {
+      throw new Error("Batch scrape could not be started for discovered sources.");
+    }
+    return scrape.run;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Research failed";
     run = await updateResearchRun(run.id, {

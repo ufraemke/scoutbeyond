@@ -10,9 +10,14 @@ import {
 import { assertTransition } from "./progress";
 import type { ResearchRunRecord } from "@/types";
 
+export type InitialBatchScrapeResult = {
+  jobId: string;
+  run: ResearchRunRecord;
+};
+
 export async function startInitialBatchScrape(
   run: ResearchRunRecord,
-): Promise<string | null> {
+): Promise<InitialBatchScrapeResult | null> {
   const sources = await listSources(run.id);
   const urls = sources.map((s) => s.url);
   if (urls.length === 0) {
@@ -20,7 +25,7 @@ export async function startInitialBatchScrape(
   }
 
   assertTransition(run.status, "scraping");
-  await updateResearchRun(run.id, {
+  const scrapingRun = await updateResearchRun(run.id, {
     status: "scraping",
     phase: "scraping",
     sources_found: sources.length,
@@ -48,5 +53,5 @@ export async function startInitialBatchScrape(
     payload: { jobId, count: urls.length },
   });
 
-  return jobId;
+  return { jobId, run: scrapingRun };
 }
