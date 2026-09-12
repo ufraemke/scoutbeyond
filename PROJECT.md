@@ -167,6 +167,14 @@ If information is missing, the system may proceed using explicitly stated assump
 
 The system searches for potentially relevant physical technologies.
 
+Live research follows `FIRECRAWL_WEBHOOK_LIVE_RESEARCH.md` and the mandatory build contract in `LIVE_RESEARCH_IMPLEMENTATION.md`:
+
+```text
+Firecrawl Search → Batch Scrape + webhooks → per-source analysis → Realtime UI
+```
+
+Progress shown to the user must reflect persisted source and candidate state. Do not fake phases, counts, or completion percentages.
+
 Research may combine:
 
 - live web research,
