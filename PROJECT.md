@@ -25,6 +25,11 @@ Primary users are:
 
 > R&D and engineering teams in mid-sized industrial companies with substantial in-house development but no dedicated technology scouting function.
 
+Specified Industry:
+
+- Mechanical Equipment 
+
+
 Typical users:
 
 - development engineers,
