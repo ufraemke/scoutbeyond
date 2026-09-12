@@ -214,9 +214,9 @@ Maintain `.env.example` with variable names only.
 Example:
 
 ```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 OPENAI_API_KEY=
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
 ```
 
 Do not put real values in `.env.example`.
