@@ -265,7 +265,12 @@ function AssumptionEditor({
                   onChange(
                     values.map((item) =>
                       item.id === assumption.id
-                        ? { ...item, description: event.target.value }
+                        ? {
+                            ...item,
+                            description: event.target.value,
+                            origin: "user",
+                            status: "confirmed",
+                          }
                         : item,
                     ),
                   )

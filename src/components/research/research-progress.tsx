@@ -72,6 +72,17 @@ export function ResearchProgress({
         </div>
       ) : null}
 
+      {run.warnings.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
+          <p className="font-semibold">Research continued with limitations:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {run.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {reviewing ? (
         <p className="mt-4 text-[13px] text-[var(--text-secondary)]">
           Currently reviewing:{" "}
