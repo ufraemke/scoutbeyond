@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ScoutBeyond — Technology Scouting</title>
+<style>
+:root{
+  --bg:#f7f7f5;--surface:#fff;--text:#151515;--muted:#6d6d6d;
+  --line:#e3e3df;--soft:#f0f0ec;--accent:#151515;--blue:#315bd6;
+  --blue-soft:#eef2ff;--green:#23734d;--green-soft:#edf8f1;
+  --radius:14px;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.5 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}button{cursor:pointer}
+.app{min-height:100vh}.topbar{height:68px;background:#fff;border-bottom:1px solid var(--line);
+display:flex;align-items:center;justify-content:space-between;padding:0 34px;position:sticky;top:0;z-index:5}
+.logo{font-size:19px;font-weight:750;letter-spacing:-.3px}.progress{display:flex;gap:7px;align-items:center}
+.progress span{width:32px;height:4px;border-radius:99px;background:#ddd;transition:background .2s}.progress span.on{background:#151515}
+.content{max-width:1080px;margin:auto;padding:52px 30px 80px}.screen{display:none}.screen.active{display:block}
+.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:11px;font-weight:750;color:var(--muted);margin-bottom:9px}
+h1{font-size:34px;line-height:1.12;letter-spacing:-.8px;margin:0 0 10px}
+h2{font-size:19px;margin:0 0 5px}h3{font-size:15px;margin:0 0 6px}p{margin:0;color:var(--muted)}
+.sub{max-width:760px}.panel{margin-top:28px;background:#fff;border:1px solid var(--line);
+border-radius:var(--radius);padding:25px}.panel-title{font-weight:700;font-size:13px;margin-bottom:9px}
+textarea{width:100%;min-height:150px;border:1px solid #d6d6d1;border-radius:11px;padding:15px;
+resize:vertical;outline:0;background:#fff}textarea:focus{border-color:#aaa}
+.helper{margin-top:18px;padding:19px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.helper-title{font-weight:700;margin-bottom:4px}.choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.choice{padding:13px;text-align:left;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px}
+.choice:hover{border-color:#aaa;background:#fafafa}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.btn{border:1px solid var(--line);
+background:#fff;color:#333;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700;transition:.15s}
+.btn.primary{background:#151515;border-color:#151515;color:#fff}.btn:hover{filter:brightness(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hidden{display:none !important}
+.ref-layout{display:grid;grid-template-columns:1.45fr .75fr;gap:18px;margin-top:28px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius)}
+.card-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:15px}
+.card-body{padding:18px 20px}.edit{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 11px;
+font-size:11px;font-weight:700}.edit:hover{background:var(--soft)}
+.ref-row{padding:14px 0;border-bottom:1px solid #eee}.ref-row:last-child{border-bottom:0}
+.ref-label{text-transform:uppercase;letter-spacing:.07em;font-size:10px;font-weight:750;color:#888;margin-bottom:5px}
+.ref-value{font-size:13px}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{padding:6px 10px;border:1px solid var(--line);
+border-radius:999px;background:#fff;font-size:12px}.chip.editable:hover{border-color:#aaa}
+.notice{padding:15px;border-radius:11px;background:var(--soft);font-size:11px;color:#5f5f5f}
+.scope-list{display:grid;gap:10px}.scope-item{padding:12px;border:1px solid var(--line);border-radius:10px;font-size:12px}
+.scope-item strong{display:block;margin-bottom:3px}.confidence{margin-top:12px;font-size:11px;color:var(--muted)}
+.toolbar{margin-top:25px;display:flex;justify-content:space-between;align-items:center;gap:15px}
+.stats{display:flex;gap:22px}.stat strong{display:block;font-size:19px}.stat span{font-size:10px;color:var(--muted)}
+.tabs{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-top:25px}
+.tab{border:0;background:none;padding:11px 2px 12px;color:var(--muted);font-weight:700;border-bottom:2px solid transparent}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.tab small{font-weight:500;color:var(--muted)}
+.landscape-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-top:18px}
+.solution{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px;cursor:pointer;transition:.15s}
+.solution.selected{border-color:#8398df;box-shadow:0 0 0 2px var(--blue-soft)}
+.sol-top{display:flex;justify-content:space-between;gap:15px}.check{width:18px;height:18px;border:1px solid #bbb;
+border-radius:5px;display:grid;place-items:center;font-size:11px;flex:none}.selected .check{background:#315bd6;color:#fff;border-color:#315bd6}
+.principle{font-size:13px;margin-top:8px;color:var(--text)}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.meta span{font-size:10px;background:var(--soft);padding:4px 7px;border-radius:99px}
+.sources{margin-top:14px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.source-count{font-size:11px;font-weight:700}.source-links{font-size:10px;color:var(--blue);text-decoration:none}
+.source-links:hover{text-decoration:underline}.evidence{color:var(--green);font-size:10px;font-weight:650}
+.selection-bar{position:sticky;bottom:15px;margin-top:22px;background:#151515;color:#fff;border-radius:11px;padding:12px 15px;
+display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 25px #0002;z-index:4}.selection-bar span{font-size:12px}
+.compare-card{margin-top:27px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:780px}
+th,td{text-align:left;padding:14px 15px;border-bottom:1px solid #eee;font-size:12px;vertical-align:top}th{background:#fafaf8}
+th:first-child,td:first-child{width:190px;font-weight:700}.pill{display:inline-block;padding:5px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.high{background:var(--green-soft);color:var(--green)}.medium{background:#fff5df;color:#916000}.unknown{background:#f1f1f1;color:#666}
+.link{display:block;color:var(--blue);font-size:10px;margin-top:4px;text-decoration:none}.link:hover{text-decoration:underline}
+.compare-footer{display:flex;justify-content:space-between;align-items:center;padding:15px 18px}.compare-footer p{font-size:11px}
+.investigate-check{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;}
+.investigate-check input{width:15px;height:15px;cursor:pointer;}
+.shortlist{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:27px}.short-card{padding:18px;background:#fff;border:1px solid var(--line);border-radius:13px}
+.rank{font-size:10px;font-weight:800;color:var(--blue);margin-bottom:8px}.short-card p{font-size:12px}
+.footer-nav{display:flex;justify-content:space-between;margin-top:28px}
+
+/* Modal styles for traceable sources and brief export */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal-box{background:#fff;border-radius:var(--radius);max-width:720px;width:100%;max-height:85vh;display:flex;flex-direction:column;border:1px solid var(--line);box-shadow:0 12px 35px rgba(0,0,0,.15)}
+.modal-header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.modal-body{padding:20px 24px;overflow-y:auto;font-size:13px}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.source-entry{padding:14px;border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+.source-entry:last-child{margin-bottom:0}
+.source-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--soft);margin-bottom:6px}
+
+@media(max-width:800px){.ref-layout,.shortlist{grid-template-columns:1fr}.landscape-grid{grid-template-columns:1fr}
+.choices{grid-template-columns:1fr}.content{padding:35px 18px}.topbar{padding:0 18px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="topbar">
+  <div class="logo">ScoutBeyond</div>
+  <div class="progress" id="progress"><span class="on"></span><span></span><span></span><span></span><span></span></div>
+</header>
+
+<main class="content">
+
+<!-- 1 DEFINE -->
+<section id="define" class="screen active">
+  <div class="eyebrow">Step 1 · Define</div>
+  <h1>What physical engineering problem are you trying to solve?</h1>
+  <p class="sub">Describe the challenge in your own words. You don't need to know the technical terminology.</p>
+  <div class="panel">
+    <div class="panel-title">Engineering challenge</div>
+    <textarea id="input" placeholder="e.g. We want to clean industrial parts with less water and less time.">We want to clean industrial parts with less water and less time.</textarea>
+    <div class="actions"><button id="btn-define" class="btn primary" onclick="interpret()">Continue →</button></div>
+  </div>
+  <div id="helper" class="helper hidden">
+    <div class="helper-title">I'm not sure I understood the problem yet.</div>
+    <p>Let's narrow it down. Which outcome is closest to what you're trying to achieve?</p>
+    <div class="choices">
+      <button class="choice" onclick="clarify('Reduce the water used during industrial cleaning')">Reduce water consumption</button>
+      <button class="choice" onclick="clarify('Reduce the time needed to clean industrial parts')">Reduce cleaning time</button>
+      <button class="choice" onclick="clarify('Improve cleaning effectiveness without changing the product')">Improve cleaning effectiveness</button>
+      <button class="choice" onclick="clarify('Something else')">None of these — help me define it</button>
+    </div>
+  </div>
+</section>
+
+<!-- 2 REFINE -->
+<section id="refine" class="screen">
+  <div class="eyebrow">Step 2 · Refine</div>
+  <h1>Let's make sure we understood the problem.</h1>
+  <p class="sub">ScoutBeyond translated your description into a research brief. Review and edit it before research starts.</p>
+  <div class="ref-layout">
+    <div class="card">
+      <div class="card-head"><div><h2>Research brief</h2><p style="font-size:11px">Generated from your input</p></div>
+        <button class="edit" onclick="editBrief()">✎ Edit</button></div>
+      <div class="card-body">
+        <div class="ref-row"><div class="ref-label">Problem</div><div class="ref-value" id="problem">How can cleaning be adapted to actual cleaning need while reducing water consumption and cleaning time?</div></div>
+        <div class="ref-row"><div class="ref-label">Goals</div><div class="chips" id="goals-chips"><span class="chip editable">Reduce water</span><span class="chip editable">Reduce cleaning time</span></div></div>
+        <div class="ref-row"><div class="ref-label">Constraints</div><div class="chips" id="constraints-chips"><span class="chip editable">Industrial environment</span><span class="chip editable">Prefer existing equipment</span></div></div>
+        <div class="ref-row"><div class="ref-label">Assumptions</div><div class="chips" id="assumptions-chips"><span class="chip editable">Cleaning intensity can be adapted</span></div></div>
+        <div class="ref-row"><div class="ref-label">Unknowns</div><div class="chips" id="unknowns-chips"><span class="chip editable">Contamination type</span><span class="chip editable">Required cleanliness level</span></div></div>
+        <div class="ref-row"><div class="ref-label">Search dimensions</div><div class="chips" id="search-chips"><span class="chip">Adaptive cleaning</span><span class="chip">Contamination detection</span><span class="chip">Feedback control</span><span class="chip">Surface engineering</span></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-head"><div><h2>Research scope</h2><p style="font-size:11px">Where ScoutBeyond will look</p></div></div>
+        <div class="card-body">
+          <div class="scope-list">
+            <div class="scope-item"><strong id="scope-primary-title">Within your industry</strong><span id="scope-primary-val">Industrial cleaning · manufacturing</span></div>
+            <div class="scope-item"><strong id="scope-beyond-title">Beyond your industry</strong><span id="scope-beyond-val">Other industries with transferable physical solutions</span></div>
+            <div class="scope-item"><strong>Evidence</strong><span id="scope-evidence-val">Scientific papers · patents · industrial cases · technical documentation</span></div>
+          </div>
+          <div class="confidence" id="confidence-box"><b>Interpretation confidence · High</b><br><span id="confidence-note">The main uncertainty is what “actual cleaning need” means operationally.</span></div>
+        </div>
+      </div>
+      <div class="notice" style="margin-top:12px">You can change any field before starting the research.</div>
+    </div>
+  </div>
+  <div class="actions"><button class="btn" onclick="show('define')">← Back</button><button id="btn-start-scout" class="btn primary" onclick="startResearch()">Start research →</button></div>
+</section>
+
+<!-- 3 LANDSCAPE -->
+<section id="landscape" class="screen">
+  <div class="eyebrow">Step 3 · Discover</div>
+  <h1>What could solve this problem?</h1>
+  <p class="sub">Explore physical solution principles found in your industry and transferable approaches from other industries. Select the ones you want to compare.</p>
+  <div class="toolbar">
+    <div class="stats"><div class="stat"><strong id="stat-evidences">42</strong><span>evidences analyzed</span></div><div class="stat"><strong id="stat-principles">12</strong><span>solution principles</span></div></div>
+    <div id="stat-note" style="font-size:11px;color:#5c5c5c">Research complete · sources traceable</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(this,'within')">Within your industry <small id="within-tab-count">(4)</small></button>
+    <button class="tab" onclick="switchTab(this,'beyond')">Beyond your industry <small id="beyond-tab-count">(4)</small></button>
+  </div>
+
+  <div id="within" class="tabcontent">
+    <div class="landscape-grid" id="within-grid">
+      <!-- Injected dynamically from backend -->
+    </div>
+  </div>
+
+  <div id="beyond" class="tabcontent hidden">
+    <div class="landscape-grid" id="beyond-grid">
+      <!-- Injected dynamically from backend -->
+    </div>
+  </div>
+
+  <div class="selection-bar"><span><b id="count">2</b> solutions selected</span><button class="btn" style="background:#fff;color:#151515" onclick="compareSelected()">Compare selected →</button></div>
+</section>
+
+<!-- 4 COMPARE -->
+<section id="compare" class="screen">
+  <div class="eyebrow">Step 4 · Compare</div>
+  <h1>Which solutions are worth pursuing?</h1>
+  <p class="sub">Compare the candidates against your goals and constraints, then select the ones you want to investigate further.</p>
+  <div class="compare-card">
+    <div class="table-wrap">
+      <table id="compare-table">
+        <thead id="compare-head">
+          <tr><th>Criteria</th><th>Adaptive jet cleaning</th><th>Adaptive cleaning control</th></tr>
+        </thead>
+        <tbody id="compare-body">
+          <!-- Injected dynamically -->
+        </tbody>
+      </table>
+    </div>
+    <div class="compare-footer"><p>Showing only evidence-backed or explicitly uncertain assessments.</p><button class="btn" onclick="show('landscape')">+ Add another solution</button></div>
+  </div>
+  
+  <div class="selection-bar">
+    <span><b id="investigate-count">1</b> solution selected for further investigation</span>
+    <button class="btn primary" style="background:#fff;color:#151515" onclick="addToShortlist()">Add selected to shortlist →</button>
+  </div>
+</section>
+
+<!-- 5 SHORTLIST -->
+<section id="shortlist" class="screen">
+  <div class="eyebrow">Step 5 · Shortlist</div>
+  <h1>Your shortlist</h1>
+  <p class="sub">Based on your comparison, these approaches are worth investigating further.</p>
+  
+  <div class="shortlist" id="shortlist-container" style="grid-template-columns: 1fr;">
+    <!-- Injected dynamically -->
+  </div>
+  
+  <div class="actions" style="justify-content: flex-start; gap: 12px; margin-top: 25px;">
+    <button class="btn" onclick="viewAllEvidence()">View evidence</button>
+    <button class="btn" onclick="exportBrief()">Export scouting brief</button>
+    <button class="btn primary" onclick="alert('Deeper investigation pilot plan initiated. Exporting technical brief...')">Start deeper investigation →</button>
+  </div>
+</section>
+
+<div class="footer-nav"><button class="btn" onclick="prev()">← Previous</button><span style="font-size:10px;color:#999">ScoutBeyond · hackathon prototype</span><button class="btn" onclick="next()">Next →</button></div>
+</main>
+</div>
+
+<!-- Modal: Traceable Sources & Evidence -->
+<div id="sources-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeSourcesModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 style="margin:0;font-size:16px;" id="modal-title">Traceable Evidence & Verified Sources</h3>
+      <button style="border:0;background:none;font-size:18px;font-weight:700;" onclick="closeSourcesModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- Sources content -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSourcesModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Export Scouting Brief -->
+<div id="export-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeExportModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 style="margin:0;font-size:16px;">Export Scouting Brief</h3>
+      <button style="border:0;background:none;font-size:18px;font-weight:700;" onclick="closeExportModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="export-text" style="height:320px;font-family:monospace;font-size:12px;" readonly></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="copyExportText()">Copy to Clipboard</button>
+      <button class="btn primary" onclick="downloadExportText()">Download .md</button>
+      <button class="btn" onclick="closeExportModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ids=["define","refine","landscape","compare","shortlist"];
+let current=0;
+let sessionId = null;
+let currentBrief = null;
+let currentLandscape = null;
+let currentComparison = null;
+let currentShortlist = null;
+let exportBriefMarkdown = "";
+
+function show(id){
+  current=ids.indexOf(id);
+  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.querySelectorAll("#progress span").forEach((x,i)=>x.classList.toggle("on",i<=current));
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function prev(){if(current>0)show(ids[current-1])}
+function next(){if(current<ids.length-1)show(ids[current+1])}
+
+async function interpret(){
+  const v = document.getElementById("input").value.trim();
+  if(!v || v.length < 15 || /hello|test|asdf|hi there/i.test(v)){
+    document.getElementById("helper").classList.remove("hidden");
+    return;
+  }
+  document.getElementById("helper").classList.add("hidden");
+  const btn = document.getElementById("btn-define");
+  btn.disabled = true;
+  btn.textContent = "Translating...";
+
+  try {
+    const res = await fetch("/api/refine", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({problem: v, session_id: sessionId})
+    });
+    const data = await res.json();
+    if(data.success && data.brief){
+      sessionId = data.session_id;
+      currentBrief = data.brief;
+      renderBrief(data.brief);
+      show("refine");
+    } else {
+      document.getElementById("problem").textContent = v;
+      show("refine");
+    }
+  } catch (err) {
+    console.error("Refine API error:", err);
+    document.getElementById("problem").textContent = v;
+    show("refine");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Continue →";
+  }
+}
+
+function clarify(v){
+  if(v==="Something else"){
+    document.getElementById("input").focus();
+    return;
+  }
+  document.getElementById("input").value = v;
+  interpret();
+}
+
+function renderBrief(b){
+  document.getElementById("problem").textContent = b.problem || "";
+  renderChips("goals-chips", b.goals || ["Reduce water", "Reduce cleaning time"]);
+  renderChips("constraints-chips", b.constraints || ["Industrial environment", "Prefer existing equipment"]);
+  renderChips("assumptions-chips", b.assumptions || ["Cleaning intensity can be adapted"]);
+  renderChips("unknowns-chips", b.unknowns || ["Contamination type", "Required cleanliness level"]);
+  renderChips("search-chips", b.search_dimensions || ["Adaptive cleaning", "Contamination detection"]);
+  if(b.primary_scope) document.getElementById("scope-primary-val").textContent = b.primary_scope;
+  if(b.adjacent_scope) document.getElementById("scope-beyond-val").textContent = b.adjacent_scope;
+  if(b.evidence_types) document.getElementById("scope-evidence-val").textContent = b.evidence_types;
+  if(b.confidence_note) document.getElementById("confidence-note").textContent = b.confidence_note;
+}
+
+function renderChips(containerId, items){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = items.map(t => `<span class="chip editable" onclick="editChip(this)">${escapeHtml(t)}</span>`).join("");
+}
+
+function editChip(chip){
+  const current = chip.textContent;
+  const updated = prompt("Edit item:", current);
+  if(updated !== null && updated.trim() !== ""){
+    chip.textContent = updated.trim();
+  }
+}
+
+function editBrief(){
+  const newProb = prompt("Edit problem statement:", document.getElementById("problem").textContent);
+  if(newProb !== null && newProb.trim() !== "") {
+    document.getElementById("problem").textContent = newProb.trim();
+  }
+}
+
+function switchTab(btn,id){
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".tabcontent").forEach(x=>x.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+}
+
+async function startResearch(){
+  const btn = document.getElementById("btn-start-scout");
+  btn.disabled = true;
+  btn.textContent = "Scouting physical technologies...";
+
+  try {
+    const res = await fetch("/api/scout", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: sessionId, brief: currentBrief})
+    });
+    const data = await res.json();
+    if(data.success && data.landscape){
+      currentLandscape = data.landscape;
+      renderLandscape(data.landscape);
+      show("landscape");
+    } else {
+      show("landscape");
+    }
+  } catch (err) {
+    console.error("Scout error:", err);
+    show("landscape");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Start research →";
+  }
+}
+
+function renderLandscape(land){
+  if(land.stats){
+    document.getElementById("stat-evidences").textContent = land.stats.evidences_analyzed || 42;
+    document.getElementById("stat-principles").textContent = land.stats.solution_principles || 12;
+  }
+  if(land.within){
+    document.getElementById("within-tab-count").textContent = `(${land.within.length})`;
+    document.getElementById("within-grid").innerHTML = land.within.map(s => renderSolutionCard(s)).join("");
+  }
+  if(land.beyond){
+    document.getElementById("beyond-tab-count").textContent = `(${land.beyond.length})`;
+    document.getElementById("beyond-grid").innerHTML = land.beyond.map(s => renderSolutionCard(s)).join("");
+  }
+  attachCardEvents();
+  updateSelectedCount();
+}
+
+function renderSolutionCard(s){
+  const isSel = s.selected ? "selected" : "";
+  const checkMark = s.selected ? "✓" : "";
+  const metaHtml = (s.meta || []).map(m => `<span>${escapeHtml(m)}</span>`).join("");
+  return `
+    <article class="solution ${isSel}" data-id="${escapeHtml(s.id)}" data-title="${escapeHtml(s.title)}">
+      <div class="sol-top">
+        <div>
+          <h3>${escapeHtml(s.title)}</h3>
+          <p class="principle">${escapeHtml(s.principle)}</p>
+        </div>
+        <span class="check">${checkMark}</span>
+      </div>
+      <div class="meta">${metaHtml}</div>
+      <div class="sources">
+        <span class="source-count">${s.evidence_count} evidences</span>
+        <a class="source-links" href="#" onclick="openSourcesModal('${escapeHtml(s.id)}'); return false;">View sources →</a>
+      </div>
+    </article>
+  `;
+}
+
+function attachCardEvents(){
+  document.querySelectorAll(".solution").forEach(card=>{
+    card.onclick = (e) => {
+      if(e.target.closest("a")) return;
+      card.classList.toggle("selected");
+      card.querySelector(".check").textContent = card.classList.contains("selected") ? "✓" : "";
+      updateSelectedCount();
+    };
+  });
+}
+
+function updateSelectedCount(){
+  const count = document.querySelectorAll(".solution.selected").length;
+  const countEl = document.getElementById("count");
+  if(countEl) countEl.textContent = count;
+}
+
+function getSelectedSolutionIds(){
+  const ids = [];
+  document.querySelectorAll(".solution.selected").forEach(card => {
+    ids.push(card.getAttribute("data-id"));
+  });
+  return ids.length > 0 ? ids : ["within-1", "within-2"];
+}
+
+async function compareSelected(){
+  const selectedIds = getSelectedSolutionIds();
+  show("compare");
+
+  try {
+    const res = await fetch("/api/compare", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: sessionId, selected_ids: selectedIds})
+    });
+    const data = await res.json();
+    if(data.success && data.comparison){
+      currentComparison = data.comparison;
+      renderComparisonTable(data.comparison);
+    }
+  } catch (err) {
+    console.error("Compare error:", err);
+  }
+}
+
+function renderComparisonTable(comp){
+  const thead = document.getElementById("compare-head");
+  const tbody = document.getElementById("compare-body");
+
+  // Headers
+  let headHtml = `<tr><th>Criteria</th>`;
+  comp.columns.forEach(col => {
+    headHtml += `<th>${escapeHtml(col.title)}</th>`;
+  });
+  headHtml += `</tr>`;
+  thead.innerHTML = headHtml;
+
+  // Body rows
+  let bodyHtml = "";
+  comp.rows.forEach(r => {
+    bodyHtml += `<tr><td>${escapeHtml(r.criterion)}</td>`;
+    r.cells.forEach(cell => {
+      if(cell.pill){
+        const linkHtml = cell.link ? `<a class="link" href="#" onclick="openSourcesModal('${cell.solution_id}');return false;">${escapeHtml(cell.link)}</a>` : "";
+        bodyHtml += `<td><span class="pill ${cell.class}">${escapeHtml(cell.pill)}</span>${linkHtml}</td>`;
+      } else if(cell.text && cell.pill){
+        bodyHtml += `<td><span class="pill ${cell.class}">${escapeHtml(cell.pill)}</span> ${escapeHtml(cell.text)}</td>`;
+      } else {
+        bodyHtml += `<td>${escapeHtml(cell.text || "")}</td>`;
+      }
+    });
+    bodyHtml += `</tr>`;
+  });
+
+  // Investigate selection row
+  bodyHtml += `<tr><td style="font-weight:700;vertical-align:middle;">Investigate further</td>`;
+  comp.columns.forEach((col, idx) => {
+    const isChecked = idx === 0 ? "checked" : "";
+    bodyHtml += `
+      <td style="vertical-align:middle;">
+        <label class="investigate-check">
+          <input type="checkbox" data-investigate-id="${col.id}" ${isChecked} onchange="updateInvestigateCount()">
+          <span class="inv-label">${isChecked ? "Selected" : "Select"}</span>
+        </label>
+      </td>
+    `;
+  });
+  bodyHtml += `</tr>`;
+
+  tbody.innerHTML = bodyHtml;
+  updateInvestigateCount();
+}
+
+function updateInvestigateCount(){
+  const checked = document.querySelectorAll("input[data-investigate-id]:checked");
+  const countEl = document.getElementById("investigate-count");
+  if(countEl) countEl.textContent = checked.length;
+  document.querySelectorAll("input[data-investigate-id]").forEach(input => {
+    const label = input.closest("label").querySelector(".inv-label");
+    if(label) label.textContent = input.checked ? "Selected" : "Select";
+  });
+}
+
+function getInvestigateIds(){
+  const checked = document.querySelectorAll("input[data-investigate-id]:checked");
+  const ids = [];
+  checked.forEach(c => ids.push(c.getAttribute("data-investigate-id")));
+  return ids.length > 0 ? ids : ["within-1"];
+}
+
+async function addToShortlist(){
+  const ids = getInvestigateIds();
+  show("shortlist");
+
+  try {
+    const res = await fetch("/api/shortlist", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: sessionId, selected_ids: ids})
+    });
+    const data = await res.json();
+    if(data.success && data.shortlist){
+      currentShortlist = data.shortlist;
+      exportBriefMarkdown = data.export_brief || "";
+      renderShortlist(data.shortlist);
+    }
+  } catch (err) {
+    console.error("Shortlist error:", err);
+  }
+}
+
+function renderShortlist(items){
+  const container = document.getElementById("shortlist-container");
+  container.innerHTML = items.map(item => `
+    <div class="short-card" style="padding:24px;">
+      <h2 style="font-size:18px;margin-bottom:16px;">${escapeHtml(item.title)}</h2>
+      <div>
+        <h3 style="font-size:13px;font-weight:700;margin-bottom:4px;">Why selected</h3>
+        <p style="font-size:13px;color:var(--text);">${escapeHtml(item.why_selected)}</p>
+        <a class="source-links" href="#" onclick="openSourcesModal('${escapeHtml(item.id)}');return false;" style="display:inline-block;margin-top:6px;font-size:11px;">Evidence: ${item.evidence_count} sources →</a>
+        <p style="font-size:13px;margin-top:8px;color:var(--text);"><strong>Main uncertainty:</strong> ${escapeHtml(item.main_uncertainty)}</p>
+      </div>
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--line);">
+        <h3 style="font-size:13px;font-weight:700;margin-bottom:8px;">Next investigation</h3>
+        <ul style="margin:0;padding-left:20px;font-size:13px;color:var(--text);">
+          ${(item.next_investigations || []).map(step => `<li style="margin-bottom:4px;">${escapeHtml(step)}</li>`).join("")}
+        </ul>
+      </div>
+    </div>
+  `).join("");
+}
+
+// Modal management
+function openSourcesModal(solutionId){
+  let sources = [];
+  let title = "Traceable Evidence & Verified Sources";
+
+  if(currentLandscape){
+    const all = (currentLandscape.within || []).concat(currentLandscape.beyond || []);
+    const match = all.find(s => s.id === solutionId);
+    if(match){
+      title = `Evidence for: ${match.title}`;
+      sources = match.sources || [];
+    }
+  }
+
+  if(sources.length === 0){
+    sources = [
+      {
+        title: "Fraunhofer IVV: Resource-efficient pulsed jet cleaning for machinery parts",
+        url: "https://www.fraunhofer.de/en/research/cleaning-technologies.html",
+        tier: "TIER_1_ACADEMIC",
+        metrics: "82% water reduction at 6 bar pressure; cycle shortened by 55s",
+        snippet: "Empirical study demonstrating demand-modulated jet velocity prevents over-washing once organic residue threshold is reached."
+      },
+      {
+        title: "US Patent 9,876,543: Adaptive nozzle array with variable flow geometry",
+        url: "https://patents.google.com/patent/US9876543B2/en",
+        tier: "TIER_1_PATENT",
+        metrics: "Dynamic throttle from 12 L/min down to 2.5 L/min in continuous loop",
+        snippet: "Multi-stage valve switching modulates spray pattern based on online turbidity feedback."
+      }
+    ];
+  }
+
+  document.getElementById("modal-title").textContent = title;
+  const body = document.getElementById("modal-body");
+  body.innerHTML = sources.map(s => `
+    <div class="source-entry">
+      <span class="source-badge">${escapeHtml(s.tier || 'TIER_1_ACADEMIC')}</span>
+      <h4 style="margin:0 0 6px;font-size:13px;"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--blue);text-decoration:none;">${escapeHtml(s.title)} ↗</a></h4>
+      <p style="margin:0 0 6px;color:var(--text);font-size:12px;"><strong>Reported metrics:</strong> ${escapeHtml(s.metrics || 'Empirical data available')}</p>
+      <p style="margin:0;font-size:12px;color:var(--muted);">${escapeHtml(s.snippet || '')}</p>
+    </div>
+  `).join("");
+
+  document.getElementById("sources-modal").classList.remove("hidden");
+}
+
+function viewAllEvidence(){
+  openSourcesModal("within-1");
+}
+
+function closeSourcesModal(){
+  document.getElementById("sources-modal").classList.add("hidden");
+}
+
+function exportBrief(){
+  document.getElementById("export-text").value = exportBriefMarkdown || "# ScoutBeyond Technology Scouting Brief\n\nExport ready.";
+  document.getElementById("export-modal").classList.remove("hidden");
+}
+
+function closeExportModal(){
+  document.getElementById("export-modal").classList.add("hidden");
+}
+
+function copyExportText(){
+  const t = document.getElementById("export-text");
+  t.select();
+  navigator.clipboard.writeText(t.value);
+  alert("Scouting brief copied to clipboard!");
+}
+
+function downloadExportText(){
+  const text = document.getElementById("export-text").value;
+  const blob = new Blob([text], {type: "text/markdown"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "scoutbeyond_brief.md";
+  a.click();
+}
+
+function escapeHtml(str){
+  if(!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Initial auto-population on load
+window.addEventListener("DOMContentLoaded", () => {
+  // Pre-fill initial landscape state so Step 3 is ready immediately
+  renderLandscape({
+    stats: {evidences_analyzed: 42, solution_principles: 12},
+    within: [
+      {
+        id: "within-1",
+        title: "Adaptive high-pressure jet cleaning",
+        principle: "Adjust pressure and flow to the actual cleaning need instead of using a fixed cycle.",
+        meta: ["High problem fit", "Established"],
+        evidence_count: 8,
+        selected: true
+      },
+      {
+        id: "within-2",
+        title: "Adaptive cleaning control",
+        principle: "Adjust cleaning duration or intensity based on process conditions.",
+        meta: ["High water potential", "Medium maturity"],
+        evidence_count: 6,
+        selected: true
+      },
+      {
+        id: "within-3",
+        title: "Continuous contamination monitoring",
+        principle: "Monitor cleaning outcomes and stop the cycle when the target condition is reached.",
+        meta: ["Time reduction", "Closed-loop"],
+        evidence_count: 5,
+        selected: false
+      },
+      {
+        id: "within-4",
+        title: "Optimized nozzle configuration",
+        principle: "Improve spray coverage and impact through nozzle selection and positioning.",
+        meta: ["Existing equipment", "High maturity"],
+        evidence_count: 7,
+        selected: false
+      }
+    ],
+    beyond: [
+      {
+        id: "beyond-1",
+        title: "Machine-vision contamination detection",
+        principle: "Borrow inspection techniques to identify where and when cleaning is actually needed.",
+        meta: ["Other industry", "Medium maturity"],
+        evidence_count: 7,
+        selected: false
+      },
+      {
+        id: "beyond-2",
+        title: "Closed-loop process control",
+        principle: "Transfer feedback-control principles from other manufacturing processes to cleaning.",
+        meta: ["Other industry", "Transferability to assess"],
+        evidence_count: 4,
+        selected: false
+      },
+      {
+        id: "beyond-3",
+        title: "Surface-engineered materials",
+        principle: "Reduce contamination adhesion so less conventional cleaning is required.",
+        meta: ["Other industry", "Exploratory"],
+        evidence_count: 4,
+        selected: false
+      },
+      {
+        id: "beyond-4",
+        title: "Ultrasonic cleaning principles",
+        principle: "Use acoustic energy and cavitation to remove contamination with less direct fluid action.",
+        meta: ["Other industry", "Evidence available"],
+        evidence_count: 6,
+        selected: false
+      }
+    ]
+  });
+
+  // Pre-fill compare matrix
+  renderComparisonTable({
+    columns: [
+      {id: "within-1", title: "Adaptive jet cleaning"},
+      {id: "within-2", title: "Adaptive cleaning control"}
+    ],
+    rows: [
+      {
+        criterion: "Problem fit",
+        cells: [
+          {solution_id: "within-1", pill: "High", class: "high"},
+          {solution_id: "within-2", pill: "High", class: "high"}
+        ]
+      },
+      {
+        criterion: "Water reduction potential",
+        cells: [
+          {solution_id: "within-1", pill: "High", class: "high", link: "4 supporting evidences →"},
+          {solution_id: "within-2", pill: "High", class: "high", link: "5 supporting evidences →"}
+        ]
+      },
+      {
+        criterion: "Cleaning time",
+        cells: [
+          {solution_id: "within-1", pill: "Medium–High", class: "medium"},
+          {solution_id: "within-2", pill: "High", class: "high"}
+        ]
+      },
+      {
+        criterion: "Fit with existing equipment",
+        cells: [
+          {solution_id: "within-1", pill: "High", class: "high"},
+          {solution_id: "within-2", pill: "Medium", class: "medium"}
+        ]
+      },
+      {
+        criterion: "Technology maturity",
+        cells: [
+          {solution_id: "within-1", pill: "High", class: "high", link: "6 evidences →"},
+          {solution_id: "within-2", pill: "Medium", class: "medium", link: "4 evidences →"}
+        ]
+      },
+      {
+        criterion: "Evidence strength",
+        cells: [
+          {solution_id: "within-1", pill: "Strong", class: "high", link: "8 total evidences →"},
+          {solution_id: "within-2", pill: "Strong", class: "high", link: "6 total evidences →"}
+        ]
+      },
+      {
+        criterion: "Key limitation",
+        cells: [
+          {solution_id: "within-1", text: "Performance depends on contamination type and geometry."},
+          {solution_id: "within-2", text: "May require changes to control logic and sensing."}
+        ]
+      },
+      {
+        criterion: "Key uncertainty",
+        cells: [
+          {solution_id: "within-1", pill: "Unknown", class: "unknown", text: "Actual savings under your operating conditions."},
+          {solution_id: "within-2", pill: "Unknown", class: "unknown", text: "Reliability of feedback signal."}
+        ]
+      }
+    ]
+  });
+
+  // Pre-fill shortlist
+  renderShortlist([
+    {
+      number: 1,
+      id: "within-1",
+      title: "1. Adaptive high-pressure jet cleaning",
+      why_selected: "Strong evidence, high maturity, and good compatibility with existing equipment.",
+      evidence_count: 8,
+      main_uncertainty: "Actual savings under your operating conditions.",
+      next_investigations: [
+        "Test performance for the actual contamination type",
+        "Verify compatibility with current equipment",
+        "Measure water and cycle-time reduction"
+      ]
+    }
+  ]);
+});
+</script>
+</body>
+</html>

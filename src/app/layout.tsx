@@ -8,9 +8,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Technology Scanner",
+  title: "ScoutBeyond — Cross-Industry Technology Intelligence",
   description:
-    "Discover relevant technical approaches beyond your industry, with structured and traceable research.",
+    "Discover transferable physical technologies beyond your industry with empirical rigor and traceable evidence.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
