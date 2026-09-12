@@ -9,6 +9,24 @@ import {
 
 const FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v2";
 
+export class FirecrawlApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    const message =
+      status === 402
+        ? "Firecrawl has insufficient credits for this research run."
+        : status === 429
+          ? "Firecrawl's request limit has been reached. Please try again later."
+          : status === 401
+            ? "Firecrawl credentials were not accepted."
+            : `The source search service failed with status ${status}.`;
+    super(message);
+    this.name = "FirecrawlApiError";
+    this.status = status;
+  }
+}
+
 function getApiKey(): string {
   const key = process.env.FIRECRAWL_API_KEY?.trim();
   if (!key) {
@@ -47,9 +65,10 @@ async function firecrawlFetch(path: string, body: unknown) {
   }
 
   if (!response.ok) {
-    throw new Error(
-      `Firecrawl ${path} failed (${response.status}): ${text.slice(0, 400)}`,
+    console.error(
+      `[firecrawl] ${path} failed (${response.status}): ${text.slice(0, 400)}`,
     );
+    throw new FirecrawlApiError(response.status);
   }
 
   return json;

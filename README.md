@@ -27,7 +27,9 @@ AI-assisted research tool for industrial R&D and engineering teams.
 
 ```text
 User challenge
-  → POST /api/research/start
+  → POST /api/research/refine (Gemini reflection only)
+  → user reviews and edits the structured brief
+  → POST /api/research/start with the confirmed brief
   → Firecrawl Search (diversified queries)
   → Persist sources in Supabase
   → Firecrawl Batch Scrape + signed webhook

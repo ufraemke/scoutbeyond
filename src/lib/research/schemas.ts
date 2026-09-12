@@ -1,5 +1,51 @@
 import { z } from "zod";
 
+const shortText = z.string().trim().min(1).max(500);
+
+export const StructuredProblemSchema = z.object({
+  statement: z.string().trim().min(12).max(4000),
+  currentSolution: z.string().trim().max(2000).optional(),
+  goals: z.array(shortText).max(12),
+  constraints: z
+    .array(
+      z.object({
+        id: shortText,
+        description: shortText,
+        importance: z.enum(["must", "should"]).optional(),
+      }),
+    )
+    .max(12),
+  assumptions: z
+    .array(
+      z.object({
+        id: shortText,
+        description: shortText,
+        origin: z.enum(["user", "ai"]),
+        status: z.enum(["confirmed", "unconfirmed", "rejected"]),
+      }),
+    )
+    .max(12),
+  unknowns: z.array(shortText).max(12),
+  searchDimensions: z
+    .array(
+      z.object({
+        id: shortText,
+        name: shortText,
+        description: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .min(1)
+    .max(10),
+});
+
+export const ResearchChallengeSchema = z.object({
+  challenge: z.string().trim().min(12).max(5000),
+});
+
+export const ResearchStartInputSchema = ResearchChallengeSchema.extend({
+  structuredProblem: StructuredProblemSchema,
+});
+
 export const ClassificationInputSchema = z.object({
   physicalPrincipleRelevant: z.boolean(),
   samePurpose: z.enum(["yes", "partial", "no"]),

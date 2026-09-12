@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResearchRunRecord, StructuredProblem } from "@/types";
 
 vi.mock("server-only", () => ({}));
@@ -6,12 +6,18 @@ vi.mock("server-only", () => ({}));
 const searchWeb = vi.fn();
 vi.mock("@/lib/firecrawl/client", () => ({
   searchWeb: (...args: unknown[]) => searchWeb(...args),
+  FirecrawlApiError: class FirecrawlApiError extends Error {
+    readonly status: number;
+
+    constructor(status: number) {
+      super(`Firecrawl failed with status ${status}.`);
+      this.status = status;
+    }
+  },
 }));
 
-const structureProblem = vi.fn();
 const generateDiversifiedQueries = vi.fn();
 vi.mock("./query-generation", () => ({
-  structureProblem: (...args: unknown[]) => structureProblem(...args),
   generateDiversifiedQueries: (...args: unknown[]) =>
     generateDiversifiedQueries(...args),
 }));
@@ -85,7 +91,7 @@ function makeRun(
 describe("startResearch orchestration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    structureProblem.mockResolvedValue(structuredProblem);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     generateDiversifiedQueries.mockResolvedValue([
       {
         query: "tank cleaning cavitation",
@@ -101,6 +107,10 @@ describe("startResearch orchestration", () => {
     ]);
     appendResearchEvent.mockResolvedValue(undefined);
     upsertDiscoveredSources.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("returns the scraping-state run without an empty database update", async () => {
@@ -142,10 +152,16 @@ describe("startResearch orchestration", () => {
     const result = await startResearch({
       ownerId: "user-1",
       challenge: "Need a safer way to clean sticky residue from food tanks.",
+      structuredProblem,
     });
 
     expect(result).toEqual(scraping);
     expect(result.status).toBe("scraping");
+    expect(createResearchRun).toHaveBeenCalledWith({
+      ownerId: "user-1",
+      challenge: "Need a safer way to clean sticky residue from food tanks.",
+      structuredProblem,
+    });
     expect(startInitialBatchScrape).toHaveBeenCalledTimes(1);
     expect(updateResearchRun).not.toHaveBeenCalledWith("run-1", {});
     for (const [, patch] of updateResearchRun.mock.calls) {
@@ -153,5 +169,119 @@ describe("startResearch orchestration", () => {
         0,
       );
     }
+  });
+
+  it("fails clearly when every Firecrawl search request fails", async () => {
+    const queued = makeRun();
+    const searching = makeRun({ status: "searching", phase: "searching" });
+    const failed = makeRun({
+      status: "failed",
+      phase: "failed",
+      errorMessage: "Firecrawl has insufficient credits for this research run.",
+    });
+
+    createResearchRun.mockResolvedValue(queued);
+    updateResearchRun
+      .mockResolvedValueOnce(searching)
+      .mockResolvedValueOnce(searching)
+      .mockResolvedValueOnce(failed);
+    searchWeb.mockRejectedValue(
+      new Error("Firecrawl has insufficient credits for this research run."),
+    );
+
+    await expect(
+      startResearch({
+        ownerId: "user-1",
+        challenge: "Need a safer way to clean sticky residue from food tanks.",
+        structuredProblem,
+      }),
+    ).rejects.toThrow("insufficient credits");
+
+    expect(upsertDiscoveredSources).not.toHaveBeenCalled();
+    expect(startInitialBatchScrape).not.toHaveBeenCalled();
+    expect(updateResearchRun).toHaveBeenLastCalledWith(
+      "run-1",
+      expect.objectContaining({
+        status: "failed",
+        error_message:
+          "Firecrawl has insufficient credits for this research run.",
+      }),
+    );
+  });
+
+  it("continues with available sources and records partial search failures", async () => {
+    const queries = [
+      {
+        query: "tank cleaning cavitation",
+        dimension: "physical_principle" as const,
+      },
+      {
+        query: "cross-industry tank residue removal",
+        dimension: "cross_industry" as const,
+      },
+    ];
+    generateDiversifiedQueries.mockResolvedValue(queries);
+    searchWeb
+      .mockRejectedValueOnce(new Error("temporary search failure"))
+      .mockResolvedValueOnce([
+        {
+          url: "https://example.com/ultrasonic",
+          title: "Ultrasonic cleaning",
+        },
+      ]);
+
+    const queued = makeRun();
+    const searching = makeRun({ status: "searching", phase: "searching" });
+    const withSources = makeRun({
+      status: "searching",
+      phase: "searching",
+      sourcesFound: 1,
+      warnings: [
+        "1 of 2 search queries failed; research continued with the available results.",
+      ],
+    });
+    const scraping = makeRun({
+      status: "scraping",
+      phase: "scraping",
+      sourcesFound: 1,
+      warnings: withSources.warnings,
+    });
+
+    createResearchRun.mockResolvedValue(queued);
+    updateResearchRun
+      .mockResolvedValueOnce(searching)
+      .mockResolvedValueOnce(searching)
+      .mockResolvedValueOnce(withSources);
+    startInitialBatchScrape.mockResolvedValue({
+      jobId: "fc-job-1",
+      run: scraping,
+    });
+
+    const result = await startResearch({
+      ownerId: "user-1",
+      challenge: "Need a safer way to clean sticky residue from food tanks.",
+      structuredProblem,
+    });
+
+    expect(result).toEqual(scraping);
+    expect(upsertDiscoveredSources).toHaveBeenCalledWith(
+      "run-1",
+      expect.arrayContaining([
+        expect.objectContaining({
+          url: "https://example.com/ultrasonic",
+          searchDimension: "cross_industry",
+        }),
+      ]),
+    );
+    expect(updateResearchRun).toHaveBeenNthCalledWith(
+      3,
+      "run-1",
+      expect.objectContaining({
+        sources_found: 1,
+        warnings: [
+          "1 of 2 search queries failed; research continued with the available results.",
+        ],
+      }),
+    );
   });
 });

@@ -186,11 +186,14 @@ failed
 
 ### 2. Start / search / scrape path
 
-Add thin `POST /api/research/start` plus services under `src/lib/research`.
+Problem structuring and user clarification happen before retrieval. A dedicated
+reflection endpoint may call Gemini and return an editable structured problem,
+but it must not call Firecrawl. `POST /api/research/start` receives the
+user-confirmed structured problem and begins the canonical live-research path.
 
 Required behavior:
 
-1. structure the problem
+1. validate and persist the user-confirmed structured problem
 2. generate diversified search dimensions from `SEARCH_STRATEGY.md`
 3. run real Firecrawl Search
 4. deduplicate URLs

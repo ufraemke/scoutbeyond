@@ -1,24 +1,26 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { startResearch } from "@/lib/research/start-research";
+import { ResearchStartInputSchema } from "@/lib/research/schemas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as { challenge?: string };
-    const challenge = body.challenge?.trim() ?? "";
-    if (challenge.length < 12) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: "Please describe the technical challenge in more detail.",
-        },
-        { status: 400 },
-      );
-    }
+  const body = await request.json().catch(() => null);
+  const parsed = ResearchStartInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Review and confirm a valid structured research brief before starting.",
+      },
+      { status: 400 },
+    );
+  }
 
+  try {
     const supabase = await createClient();
     const {
       data: { user },
@@ -38,7 +40,8 @@ export async function POST(request: Request) {
 
     const run = await startResearch({
       ownerId: user.id,
-      challenge,
+      challenge: parsed.data.challenge,
+      structuredProblem: parsed.data.structuredProblem,
     });
 
     return NextResponse.json({
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
       status: run.status,
     });
   } catch (error) {
+    console.error("[research start]", error);
     const message =
       error instanceof Error ? error.message : "Research could not be started.";
     return NextResponse.json({ ok: false, message }, { status: 500 });
