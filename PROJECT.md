@@ -368,43 +368,19 @@ The UI should distinguish between:
 
 ## 11. Candidate Data Model
 
-Initial conceptual structure:
+Canonical TypeScript types live in `src/types/research.ts`.
 
-```ts
-type Candidate = {
-  id: string
-  name: string
-  category: "established" | "adjacent" | "exploratory"
-  industries: string[]
-  physicalMechanisms: string[]
+Import them from `@/types`. Do not create parallel Candidate, Source, or ResearchResult shapes.
 
-  summary: string
-  relevance: string
+The shared model covers:
 
-  strengths: string[]
-  limitations: string[]
+- research request and structured problem definition
+- evaluation criteria
+- candidates (principle, applicability, evidence, scoring, verification)
+- shortlist
+- research metadata
 
-  maturity?: string
-  score?: number
-
-  sustainability?: {
-    water?: string
-    energy?: string
-    chemicals?: string
-  }
-
-  sources: Source[]
-}
-
-type Source = {
-  title: string
-  url: string
-  sourceType?: string
-  publisher?: string
-}
-```
-
-This schema may evolve during implementation.
+Source-backed findings (`EvidenceItem`) stay separate from AI interpretation (`relevance`, assessments, scores).
 
 ---
 
