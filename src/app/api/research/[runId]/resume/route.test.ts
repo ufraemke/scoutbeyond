@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextResponse } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   afterCallbacks: [] as Array<() => Promise<void> | void>,
-  getUser: vi.fn(),
+  requireOwner: vi.fn(),
   getResearchRun: vi.fn(),
   getRunSnapshot: vi.fn(),
   getStaleAnalysisBatch: vi.fn(),
@@ -21,10 +22,8 @@ vi.mock("next/server", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({
-    auth: { getUser: mocks.getUser },
-  }),
+vi.mock("@/lib/supabase/require-owner", () => ({
+  requireOwner: (...args: unknown[]) => mocks.requireOwner(...args),
 }));
 
 vi.mock("@/lib/research/repository", () => ({
@@ -52,10 +51,7 @@ describe("POST /api/research/[runId]/resume", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.afterCallbacks.length = 0;
-    mocks.getUser.mockResolvedValue({
-      data: { user: { id: "owner-1" } },
-      error: null,
-    });
+    mocks.requireOwner.mockResolvedValue({ ok: true, ownerId: "owner-1" });
     mocks.getResearchRun.mockResolvedValue({
       id: "run-1",
       ownerId: "owner-1",
@@ -118,9 +114,12 @@ describe("POST /api/research/[runId]/resume", () => {
   });
 
   it("requires an authenticated session", async () => {
-    mocks.getUser.mockResolvedValue({
-      data: { user: null },
-      error: null,
+    mocks.requireOwner.mockResolvedValue({
+      ok: false,
+      response: NextResponse.json(
+        { ok: false, message: "Authentication required. Refresh the page and try again." },
+        { status: 401 },
+      ),
     });
 
     const response = await POST(

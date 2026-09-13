@@ -7,19 +7,14 @@ vi.mock("@/lib/supabase/require-owner", () => ({
   requireOwner: (...args: unknown[]) => requireOwner(...args),
 }));
 
-const reflectProblem = vi.fn();
-vi.mock("@/lib/research/query-generation", () => ({
-  reflectProblem: (...args: unknown[]) => reflectProblem(...args),
-}));
-
-const searchWeb = vi.fn();
-vi.mock("@/lib/firecrawl/client", () => ({
-  searchWeb: (...args: unknown[]) => searchWeb(...args),
+const startResearch = vi.fn();
+vi.mock("@/lib/research/start-research", () => ({
+  startResearch: (...args: unknown[]) => startResearch(...args),
 }));
 
 import { POST } from "./route";
 
-const problem: StructuredProblem = {
+const structuredProblem: StructuredProblem = {
   statement:
     "Reduce tank-cleaning water use while reliably removing sticky residue.",
   goals: ["Reduce water consumption"],
@@ -29,30 +24,28 @@ const problem: StructuredProblem = {
   searchDimensions: [
     { id: "direct", name: "Direct application" },
     { id: "physical_principle", name: "Physical principle" },
-    { id: "adjacent_application", name: "Adjacent applications" },
-    { id: "cross_industry", name: "Cross-industry transfer" },
-    { id: "emerging", name: "Emerging research" },
   ],
 };
 
-describe("POST /api/research/refine", () => {
+describe("POST /api/research/start", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireOwner.mockResolvedValue({ ok: true, ownerId: "user-1" });
-    reflectProblem.mockResolvedValue({
-      problem,
-      generationMode: "gemini",
+    startResearch.mockResolvedValue({
+      id: "run-1",
+      status: "scraping",
     });
   });
 
-  it("returns a Gemini brief without calling Firecrawl", async () => {
+  it("starts research for an authenticated owner", async () => {
     const response = await POST(
-      new Request("http://localhost/api/research/refine", {
+      new Request("http://localhost/api/research/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challenge:
             "Reduce water use when cleaning sticky residue from industrial tanks.",
+          structuredProblem,
         }),
       }),
     );
@@ -60,39 +53,46 @@ describe("POST /api/research/refine", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      problem,
-      generationMode: "gemini",
+      runId: "run-1",
+      status: "scraping",
     });
-    expect(reflectProblem).toHaveBeenCalledTimes(1);
-    expect(searchWeb).not.toHaveBeenCalled();
+    expect(startResearch).toHaveBeenCalledWith({
+      ownerId: "user-1",
+      challenge:
+        "Reduce water use when cleaning sticky residue from industrial tanks.",
+      structuredProblem,
+    });
   });
 
-  it("requires the anonymous Supabase session", async () => {
+  it("returns 401 without starting research when the session is missing", async () => {
     requireOwner.mockResolvedValue({
       ok: false,
       response: NextResponse.json(
-        { ok: false, message: "Authentication required. Refresh the page and try again." },
+        {
+          ok: false,
+          message: "Authentication required. Refresh the page and try again.",
+        },
         { status: 401 },
       ),
     });
 
     const response = await POST(
-      new Request("http://localhost/api/research/refine", {
+      new Request("http://localhost/api/research/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challenge:
             "Reduce water use when cleaning sticky residue from industrial tanks.",
+          structuredProblem,
         }),
       }),
     );
 
     expect(response.status).toBe(401);
-    expect(reflectProblem).not.toHaveBeenCalled();
-    expect(searchWeb).not.toHaveBeenCalled();
+    expect(startResearch).not.toHaveBeenCalled();
   });
 
-  it("does not start reflection when auth is temporarily unavailable", async () => {
+  it("returns 503 without starting research when auth is temporarily unavailable", async () => {
     requireOwner.mockResolvedValue({
       ok: false,
       response: NextResponse.json(
@@ -106,17 +106,19 @@ describe("POST /api/research/refine", () => {
     });
 
     const response = await POST(
-      new Request("http://localhost/api/research/refine", {
+      new Request("http://localhost/api/research/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           challenge:
             "Reduce water use when cleaning sticky residue from industrial tanks.",
+          structuredProblem,
         }),
       }),
     );
 
     expect(response.status).toBe(503);
-    expect(reflectProblem).not.toHaveBeenCalled();
+    expect(response.headers.get("Retry-After")).toBe("5");
+    expect(startResearch).not.toHaveBeenCalled();
   });
 });

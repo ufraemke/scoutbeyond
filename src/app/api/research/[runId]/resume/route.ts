@@ -1,5 +1,4 @@
 import { after, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { analyseSource } from "@/lib/research/analyse-source";
 import { maybeStartCounterCheck } from "@/lib/research/counter-check";
 import {
@@ -7,6 +6,7 @@ import {
   getStaleAnalysisBatch,
   queueAnalysisSources,
 } from "@/lib/research/repository";
+import { requireOwner } from "@/lib/supabase/require-owner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,20 +17,13 @@ type Params = { params: Promise<{ runId: string }> };
 
 export async function POST(_request: Request, { params }: Params) {
   const { runId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, message: "Unauthorized" },
-      { status: 401 },
-    );
+  const auth = await requireOwner({ route: "POST /api/research/[runId]/resume" });
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const run = await getResearchRun(runId);
-  if (!run || run.ownerId !== user.id) {
+  if (!run || run.ownerId !== auth.ownerId) {
     return NextResponse.json(
       { ok: false, message: "Not found" },
       { status: 404 },
