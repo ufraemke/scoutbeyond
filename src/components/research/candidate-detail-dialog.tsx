@@ -12,6 +12,7 @@ export function CandidateDetailDialog({
   evidence: LiveEvidenceRecord[];
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const linked = useMemo(
     () => evidence.filter((item) => item.candidateId === candidate.id),
@@ -28,12 +29,34 @@ export function CandidateDetailDialog({
   }, [linked]);
 
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
   }, [onClose]);
 
   return (
@@ -45,10 +68,11 @@ export function CandidateDetailDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="candidate-detail-title"
-        className="flex max-h-[88vh] w-full max-w-[820px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[88vh] w-full max-w-[820px] flex-col overflow-hidden rounded-[14px] bg-white"
       >
         <header className="flex items-start justify-between gap-5 border-b border-[#e5e5e2] px-6 py-5">
           <div>
@@ -80,20 +104,37 @@ export function CandidateDetailDialog({
             <DetailSection title="Why it may work">
               {candidate.relevance || candidate.summary || "Not assessed yet."}
             </DetailSection>
+            <DetailSection title="Main limitation">
+              {candidate.limitations[0] || "Not documented yet."}
+            </DetailSection>
             <DetailSection title="Maturity and applicability">
               {formatMaturity(candidate)} · {formatApplicability(candidate)}
             </DetailSection>
-            <DetailList title="Potential benefits" items={candidate.benefits} />
-            <DetailList title="Limitations" items={candidate.limitations} />
-            <DetailList
-              title="Uncertainties"
-              items={candidate.uncertainties.map((item) =>
-                typeof item === "string"
-                  ? item
-                  : item.description || "Unresolved uncertainty",
-              )}
-            />
+            <DetailSection title="Evidence strength">
+              {candidate.evidenceQuality ?? "Not assessed yet."}
+            </DetailSection>
           </div>
+
+          <details className="mt-6 border-t border-[#e5e5e2] pt-5">
+            <summary className="cursor-pointer text-[12px] font-semibold text-[#176b87]">
+              Additional technical details
+            </summary>
+            <div className="mt-4 grid gap-5 md:grid-cols-2">
+              <DetailList title="Potential benefits" items={candidate.benefits} />
+              <DetailList
+                title="Other limitations"
+                items={candidate.limitations.slice(1)}
+              />
+              <DetailList
+                title="Uncertainties"
+                items={candidate.uncertainties.map((item) =>
+                  typeof item === "string"
+                    ? item
+                    : item.description || "Unresolved uncertainty",
+                )}
+              />
+            </div>
+          </details>
 
           <section className="mt-7 border-t border-[#e5e5e2] pt-6">
             <div className="flex flex-wrap items-end justify-between gap-3">

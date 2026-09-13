@@ -24,8 +24,8 @@ function createId(prefix: string) {
 
 export function EditableResearchBrief({ value, onChange }: Props) {
   return (
-    <div className="grid grid-cols-12 gap-6">
-      <div className="col-span-8 space-y-6">
+    <div className="grid gap-6 lg:grid-cols-12">
+      <div className="space-y-6 lg:col-span-8">
         <EditorSurface title="Refined Engineering Problem">
           <label className="block text-[12px] font-semibold text-[#626262]">
             Problem statement
@@ -71,7 +71,7 @@ export function EditableResearchBrief({ value, onChange }: Props) {
         />
       </div>
 
-      <div className="col-span-4 space-y-6">
+      <div className="space-y-6 lg:col-span-4">
         <StringListEditor
           title="Known Unknowns"
           values={value.unknowns}
@@ -187,7 +187,7 @@ function ConstraintEditor({
         {values.map((constraint, index) => (
           <div
             key={constraint.id}
-            className="grid grid-cols-[1fr_96px_auto] items-center gap-2"
+            className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_96px_auto]"
           >
             <input
               aria-label={`Constraint ${index + 1}`}

@@ -11,103 +11,84 @@ export function ResearchProgress({
   connection: string;
 }) {
   const reviewing = sources.find(
-    (s) => s.status === "scraping" || s.status === "analysing",
+    (source) =>
+      source.status === "scraping" || source.status === "analysing",
   );
   const knownTotal = run.sourcesFound > 0;
-  const retrieved = run.sourcesScraped;
   const finished = run.sourcesAnalysed + run.sourcesFailed;
+  const connectionNeedsAttention =
+    connection !== "connected" && connection !== "connecting";
 
   return (
     <section
       aria-live="polite"
-      className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-6 py-5"
+      className="rounded-[12px] border border-[#e5e5e2] bg-white px-5 py-4"
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#176b87]">
             Live research
           </p>
-          <h2 className="mt-1 text-[24px] font-semibold tracking-tight text-[var(--text-primary)]">
+          <h2 className="mt-1 text-[20px] font-semibold tracking-tight">
             {phaseLabel(run.status)}
           </h2>
-          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)]">
-            {run.challenge}
-          </p>
         </div>
-        <div className="text-right text-[13px] text-[var(--text-secondary)]">
-          <p>
-            Connection:{" "}
-            <span className="font-medium text-[var(--text-primary)]">
-              {connection}
-            </span>
-          </p>
-          {run.errorMessage ? (
-            <p className="mt-1 text-[#916000]">{run.errorMessage}</p>
-          ) : null}
-        </div>
-      </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-4">
-        <Stat
-          label="Sources found"
-          value={knownTotal ? String(run.sourcesFound) : "—"}
-        />
-        <Stat
-          label="Sources retrieved"
-          value={
-            knownTotal
-              ? `${retrieved} / ${run.sourcesFound}`
-              : String(run.sourcesScraped)
-          }
-        />
-        <Stat
-          label="Sources analysed"
-          value={
-            knownTotal
-              ? `${run.sourcesAnalysed} / ${run.sourcesFound}`
-              : String(run.sourcesAnalysed)
-          }
-        />
-        <Stat label="Candidates" value={String(run.candidatesCount)} />
+        <div className="flex items-center gap-7 text-right">
+          <Stat
+            label="Sources analysed"
+            value={
+              knownTotal
+                ? `${run.sourcesAnalysed} / ${run.sourcesFound}`
+                : String(run.sourcesAnalysed)
+            }
+          />
+          <Stat label="Candidates" value={String(run.candidatesCount)} />
+        </div>
       </div>
 
       {knownTotal ? (
-        <div className="mt-4">
-          <progress
-            className="h-2 w-full overflow-hidden rounded bg-[var(--border)]"
-            max={run.sourcesFound}
-            value={Math.min(finished, run.sourcesFound)}
-            aria-label="Sources with completed or failed analysis"
-          />
-        </div>
-      ) : null}
-
-      {run.warnings.length > 0 ? (
-        <div className="mt-4 rounded-lg border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
-          <p className="font-semibold">Research continued with limitations:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-4">
-            {run.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </div>
+        <progress
+          className="mt-4 h-1.5 w-full overflow-hidden rounded bg-[#e5e5e2]"
+          max={run.sourcesFound}
+          value={Math.min(finished, run.sourcesFound)}
+          aria-label="Sources with completed or failed analysis"
+        />
       ) : null}
 
       {reviewing ? (
-        <p className="mt-4 text-[13px] text-[var(--text-secondary)]">
+        <p className="mt-3 truncate text-[12px] text-[#626262]">
           Currently reviewing:{" "}
-          <span className="font-medium text-[var(--text-primary)]">
+          <span className="font-medium text-[#161616]">
             {reviewing.title || reviewing.url}
           </span>
         </p>
-      ) : null}
-
-      {run.sourcesFailed > 0 ? (
-        <p className="mt-3 text-[13px] text-[var(--text-secondary)]">
-          {run.sourcesFailed} source
-          {run.sourcesFailed === 1 ? "" : "s"} failed and were skipped. Partial
-          results remain available.
+      ) : (
+        <p className="mt-3 truncate text-[12px] text-[#626262]">
+          {run.challenge}
         </p>
+      )}
+
+      {run.warnings.length > 0 ||
+      run.sourcesFailed > 0 ||
+      run.errorMessage ||
+      connectionNeedsAttention ? (
+        <div className="mt-4 rounded-[8px] border border-[#f0d9a8] bg-[#fff9ea] px-3 py-2 text-[12px] text-[#916000]">
+          {connectionNeedsAttention ? (
+            <p>Live connection: {connection}.</p>
+          ) : null}
+          {run.errorMessage ? <p>{run.errorMessage}</p> : null}
+          {run.sourcesFailed > 0 ? (
+            <p>
+              {run.sourcesFailed} source
+              {run.sourcesFailed === 1 ? "" : "s"} failed; partial results
+              remain available.
+            </p>
+          ) : null}
+          {run.warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
       ) : null}
     </section>
   );
@@ -116,12 +97,10 @@ export function ResearchProgress({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[#8a8a8a]">
         {label}
       </p>
-      <p className="mt-1 text-[22px] font-semibold text-[var(--text-primary)]">
-        {value}
-      </p>
+      <p className="mt-0.5 text-[16px] font-semibold">{value}</p>
     </div>
   );
 }
