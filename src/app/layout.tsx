@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: "ScoutBeyond — Cross-Industry Technology Intelligence",
   description:
     "Discover transferable physical technologies beyond your industry with empirical rigor and traceable evidence.",
+  icons: {
+    icon: [{ url: "/Favicon ScoutBeyond.png", type: "image/png" }],
+    shortcut: "/Favicon ScoutBeyond.png",
+    apple: "/Favicon ScoutBeyond.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
