@@ -124,6 +124,11 @@ export async function mergeExtractedCandidate(input: {
       .select("*")
       .single();
 
+    if (error?.code === "23505") {
+      // Concurrent source analyses may discover the same physical principle.
+      // Re-run against the row that won the unique-key race and merge normally.
+      return mergeExtractedCandidate(input);
+    }
     if (error || !data) {
       throw new Error(error?.message || "Failed to insert candidate.");
     }
@@ -131,7 +136,7 @@ export async function mergeExtractedCandidate(input: {
   }
 
   for (const finding of input.findings) {
-    await supabase.from("live_evidence").insert({
+    const { error } = await supabase.from("live_evidence").insert({
       research_run_id: input.researchRunId,
       candidate_id: candidateRow.id,
       source_id: input.sourceId,
@@ -141,6 +146,9 @@ export async function mergeExtractedCandidate(input: {
       confidence: input.confidence,
       exact_excerpt: finding.exactExcerpt ?? null,
     });
+    if (error) {
+      throw new Error(error.message);
+    }
   }
 
   await refreshRunCounters(input.researchRunId);

@@ -17,7 +17,11 @@ import {
 } from "@/lib/research";
 import { ClassificationInputSchema } from "@/lib/research/schemas";
 import { SourceExtractionSchema } from "@/lib/gemini/extraction-schema";
-import { analysisIsAsyncContract } from "@/lib/research/progress";
+import {
+  analysisIsAsyncContract,
+  isSourceAnalysisTerminal,
+  terminalSourceAnalysisPatch,
+} from "@/lib/research/progress";
 
 describe("verifyFirecrawlSignature", () => {
   it("accepts a valid sha256 HMAC signature over the raw body", () => {
@@ -117,6 +121,33 @@ describe("state transitions and counters", () => {
         "Exploring adjacent industries...",
       ]),
     ).toBe(false);
+  });
+
+  it("maps every terminal analysis outcome to a terminal source state", () => {
+    expect(
+      terminalSourceAnalysisPatch("completed", {
+        timestamp: "2026-09-13T00:00:00.000Z",
+      }),
+    ).toEqual({
+      analysis_status: "completed",
+      status: "analysed",
+      analysed_at: "2026-09-13T00:00:00.000Z",
+    });
+    expect(
+      terminalSourceAnalysisPatch("skipped", {
+        errorMessage: "No content",
+      }),
+    ).toEqual({
+      analysis_status: "skipped",
+      status: "failed",
+      error_message: "No content",
+    });
+    expect(
+      isSourceAnalysisTerminal({
+        status: "analysing",
+        analysisStatus: "failed",
+      }),
+    ).toBe(true);
   });
 });
 

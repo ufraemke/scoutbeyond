@@ -16,7 +16,7 @@ import {
   refreshRunCounters,
   updateSource,
 } from "./repository";
-import { assertTransition } from "./progress";
+import { assertTransition, terminalSourceAnalysisPatch } from "./progress";
 
 export async function analyseSource(sourceId: string): Promise<void> {
   const source = await getSource(sourceId);
@@ -25,10 +25,12 @@ export async function analyseSource(sourceId: string): Promise<void> {
   }
   if (!source.markdown) {
     await updateSource(sourceId, {
-      analysis_status: "skipped",
-      status: source.status === "failed" ? "failed" : "scraped",
-      error_message: source.errorMessage ?? "No scraped content available.",
+      ...terminalSourceAnalysisPatch("skipped", {
+        errorMessage:
+          source.errorMessage ?? "No scraped content available.",
+      }),
     });
+    await refreshRunCounters(source.researchRunId);
     return;
   }
 
@@ -39,6 +41,11 @@ export async function analyseSource(sourceId: string): Promise<void> {
 
   const run = await getResearchRun(claimed.researchRunId);
   if (!run) {
+    await updateSource(sourceId, {
+      ...terminalSourceAnalysisPatch("failed", {
+        errorMessage: "Research run no longer exists.",
+      }),
+    });
     return;
   }
 
@@ -64,9 +71,7 @@ export async function analyseSource(sourceId: string): Promise<void> {
 
     if (!extraction.inScope || extraction.candidates.length === 0) {
       await updateSource(sourceId, {
-        analysis_status: "completed",
-        status: "analysed",
-        analysed_at: new Date().toISOString(),
+        ...terminalSourceAnalysisPatch("completed"),
       });
       await appendResearchEvent({
         researchRunId: run.id,
@@ -124,9 +129,7 @@ export async function analyseSource(sourceId: string): Promise<void> {
     }
 
     await updateSource(sourceId, {
-      analysis_status: "completed",
-      status: "analysed",
-      analysed_at: new Date().toISOString(),
+      ...terminalSourceAnalysisPatch("completed"),
     });
 
     await appendResearchEvent({
@@ -140,8 +143,7 @@ export async function analyseSource(sourceId: string): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Analysis failed";
     await updateSource(sourceId, {
-      analysis_status: "failed",
-      error_message: message,
+      ...terminalSourceAnalysisPatch("failed", { errorMessage: message }),
     });
     await appendResearchEvent({
       researchRunId: claimed.researchRunId,
@@ -151,15 +153,6 @@ export async function analyseSource(sourceId: string): Promise<void> {
     });
     await refreshRunCounters(claimed.researchRunId);
   }
-}
-
-export async function resumeStaleAnalysis(researchRunId: string): Promise<number> {
-  const { listStaleAnalysisSources } = await import("./repository");
-  const stale = await listStaleAnalysisSources(researchRunId);
-  for (const source of stale) {
-    await analyseSource(source.id);
-  }
-  return stale.length;
 }
 
 export async function countCandidates(researchRunId: string): Promise<number> {

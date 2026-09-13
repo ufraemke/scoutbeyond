@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ResearchRunSnapshot } from "@/types";
 
@@ -10,26 +10,50 @@ export function useResearchRun(runId: string) {
   const [snapshot, setSnapshot] = useState<ResearchRunSnapshot | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [error, setError] = useState<string | null>(null);
+  const inFlightSnapshot = useRef<Promise<ResearchRunSnapshot> | null>(null);
 
   const loadSnapshot = useCallback(async () => {
-    const response = await fetch(`/api/research/${runId}`, { cache: "no-store" });
-    const json = (await response.json()) as {
-      ok: boolean;
-      message?: string;
-      snapshot?: ResearchRunSnapshot;
-    };
-    if (!response.ok || !json.ok || !json.snapshot) {
-      throw new Error(json.message || "Could not load research run.");
+    if (inFlightSnapshot.current) {
+      return inFlightSnapshot.current;
     }
-    setSnapshot(json.snapshot);
-    setError(null);
-    return json.snapshot;
+
+    const request = (async () => {
+      const response = await fetch(`/api/research/${runId}`, {
+        cache: "no-store",
+      });
+      const json = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        snapshot?: ResearchRunSnapshot;
+      };
+      if (!response.ok || !json.ok || !json.snapshot) {
+        throw new Error(json.message || "Could not load research run.");
+      }
+      setSnapshot(json.snapshot);
+      setError(null);
+      return json.snapshot;
+    })();
+
+    inFlightSnapshot.current = request;
+    try {
+      return await request;
+    } finally {
+      inFlightSnapshot.current = null;
+    }
   }, [runId]);
 
   useEffect(() => {
     let cancelled = false;
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null =
       null;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleSnapshotRefresh() {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        if (!cancelled) void loadSnapshot();
+      }, 250);
+    }
 
     async function boot() {
       try {
@@ -48,9 +72,7 @@ export function useResearchRun(runId: string) {
               table: "research_runs",
               filter: `id=eq.${runId}`,
             },
-            () => {
-              void loadSnapshot();
-            },
+            scheduleSnapshotRefresh,
           )
           .on(
             "postgres_changes",
@@ -60,9 +82,7 @@ export function useResearchRun(runId: string) {
               table: "research_events",
               filter: `research_run_id=eq.${runId}`,
             },
-            () => {
-              void loadSnapshot();
-            },
+            scheduleSnapshotRefresh,
           )
           .on(
             "postgres_changes",
@@ -72,9 +92,7 @@ export function useResearchRun(runId: string) {
               table: "live_candidates",
               filter: `research_run_id=eq.${runId}`,
             },
-            () => {
-              void loadSnapshot();
-            },
+            scheduleSnapshotRefresh,
           )
           .on(
             "postgres_changes",
@@ -84,9 +102,17 @@ export function useResearchRun(runId: string) {
               table: "research_sources",
               filter: `research_run_id=eq.${runId}`,
             },
-            () => {
-              void loadSnapshot();
+            scheduleSnapshotRefresh,
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "live_evidence",
+              filter: `research_run_id=eq.${runId}`,
             },
+            scheduleSnapshotRefresh,
           )
           .subscribe((status) => {
             if (status === "SUBSCRIBED") {
@@ -110,6 +136,7 @@ export function useResearchRun(runId: string) {
 
     return () => {
       cancelled = true;
+      if (refreshTimer) clearTimeout(refreshTimer);
       if (channel) {
         const supabase = createClient();
         void supabase.removeChannel(channel);
@@ -129,21 +156,23 @@ export function useResearchRun(runId: string) {
   }, [loadSnapshot]);
 
   const resume = useCallback(async () => {
-    const response = await fetch(`/api/research/${runId}`, { method: "POST" });
+    const response = await fetch(`/api/research/${runId}/resume`, {
+      method: "POST",
+    });
     const json = (await response.json()) as {
       ok: boolean;
       message?: string;
-      snapshot?: ResearchRunSnapshot;
+      scheduled?: number;
+      remaining?: number;
     };
     if (!response.ok || !json.ok) {
       throw new Error(json.message || "Resume failed");
     }
-    if (json.snapshot) {
-      setSnapshot(json.snapshot);
-    } else {
-      await loadSnapshot();
-    }
-  }, [loadSnapshot, runId]);
+    return {
+      scheduled: json.scheduled ?? 0,
+      remaining: json.remaining ?? 0,
+    };
+  }, [runId]);
 
   return { snapshot, connection, error, refetch, resume };
 }

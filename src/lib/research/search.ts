@@ -52,7 +52,22 @@ export function buildFallbackQueries(
   problem: StructuredProblem,
 ): DiversifiedSearchQuery[] {
   const statement = problem.statement;
-  return [
+  const priorities = problem.researchPreferences;
+  const evidenceTerms = (priorities?.evidenceTypes ?? [])
+    .map((type) => {
+      switch (type) {
+        case "scientific_papers":
+          return "research paper";
+        case "patents":
+          return "patent";
+        case "industrial_cases":
+          return "industrial case study";
+        case "technical_documentation":
+          return "technical documentation";
+      }
+    })
+    .join(" ");
+  const queries: DiversifiedSearchQuery[] = [
     {
       query: `${statement} industrial technologies`,
       dimension: "direct",
@@ -94,6 +109,25 @@ export function buildFallbackQueries(
       rationale: "Emerging approaches",
     },
   ];
+
+  return queries.map((query) => ({
+    ...query,
+    query: [
+      query.query,
+      priorities?.industryFocus === "within" && query.dimension === "direct"
+        ? "same-industry"
+        : "",
+      priorities?.industryFocus === "beyond" &&
+      ["adjacent_application", "cross_industry", "emerging"].includes(
+        query.dimension,
+      )
+        ? "cross-industry"
+        : "",
+      evidenceTerms,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  }));
 }
 
 export function structureProblemFromChallenge(challenge: string): StructuredProblem {

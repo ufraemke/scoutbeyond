@@ -55,6 +55,27 @@ type DbSource = {
   analysed_at: string | null;
 };
 
+type DbSnapshotSource = Pick<
+  DbSource,
+  | "id"
+  | "research_run_id"
+  | "url"
+  | "canonical_url"
+  | "title"
+  | "status"
+  | "analysis_status"
+  | "error_message"
+  | "created_at"
+  | "updated_at"
+  | "scraped_at"
+  | "analysed_at"
+>;
+
+export type SourceProgressRecord = Pick<
+  ResearchSourceRecord,
+  "id" | "status" | "analysisStatus" | "updatedAt"
+>;
+
 type DbEvent = {
   id: string;
   research_run_id: string;
@@ -138,6 +159,25 @@ export function mapSource(row: DbSource): ResearchSourceRecord {
     scrapeId: row.scrape_id,
     markdown: row.markdown,
     metadata: row.metadata ?? {},
+    errorMessage: row.error_message,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    scrapedAt: row.scraped_at,
+    analysedAt: row.analysed_at,
+  };
+}
+
+export function mapSnapshotSource(
+  row: DbSnapshotSource,
+): ResearchSourceRecord {
+  return {
+    id: row.id,
+    researchRunId: row.research_run_id,
+    url: row.url,
+    canonicalUrl: row.canonical_url,
+    title: row.title,
+    status: row.status,
+    analysisStatus: row.analysis_status,
     errorMessage: row.error_message,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -327,6 +367,29 @@ export async function listSources(researchRunId: string): Promise<ResearchSource
   return (data as DbSource[]).map(mapSource);
 }
 
+export async function listSourceProgress(
+  researchRunId: string,
+): Promise<SourceProgressRecord[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("research_sources")
+    .select("id,status,analysis_status,updated_at")
+    .eq("research_run_id", researchRunId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as Array<
+    Pick<DbSource, "id" | "status" | "analysis_status" | "updated_at">
+  >).map((row) => ({
+    id: row.id,
+    status: row.status,
+    analysisStatus: row.analysis_status,
+    updatedAt: row.updated_at,
+  }));
+}
+
 export async function getSource(sourceId: string): Promise<ResearchSourceRecord | null> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -355,6 +418,26 @@ export async function updateSource(
     throw new Error(error?.message || "Failed to update source.");
   }
   return mapSource(data as DbSource);
+}
+
+export async function queueAnalysisSources(sourceIds: string[]): Promise<void> {
+  if (sourceIds.length === 0) {
+    return;
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("research_sources")
+    .update({
+      analysis_status: "queued",
+      status: "scraped",
+      error_message: null,
+    })
+    .in("id", sourceIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function findSourceByCanonicalUrl(
@@ -446,25 +529,30 @@ export async function markWebhookProcessed(deliveryKey: string): Promise<void> {
 }
 
 export async function refreshRunCounters(researchRunId: string): Promise<ResearchRunRecord> {
-  const sources = await listSources(researchRunId);
+  const supabase = createAdminClient();
+  const [sources, candidates] = await Promise.all([
+    listSourceProgress(researchRunId),
+    supabase
+      .from("live_candidates")
+      .select("id", { count: "exact", head: true })
+      .eq("research_run_id", researchRunId),
+  ]);
   const scraped = sources.filter((s) =>
     ["scraped", "analysing", "analysed"].includes(s.status),
   ).length;
   const analysed = sources.filter((s) => s.status === "analysed").length;
   const failed = sources.filter((s) => s.status === "failed").length;
 
-  const supabase = createAdminClient();
-  const { count } = await supabase
-    .from("live_candidates")
-    .select("id", { count: "exact", head: true })
-    .eq("research_run_id", researchRunId);
+  if (candidates.error) {
+    throw new Error(candidates.error.message);
+  }
 
   return updateResearchRun(researchRunId, {
     sources_found: sources.length,
     sources_scraped: scraped,
     sources_analysed: analysed,
     sources_failed: failed,
-    candidates_count: count ?? 0,
+    candidates_count: candidates.count ?? 0,
   });
 }
 
@@ -476,7 +564,13 @@ export async function getRunSnapshot(researchRunId: string): Promise<ResearchRun
 
   const supabase = createAdminClient();
   const [sources, events, candidates, evidence] = await Promise.all([
-    listSources(researchRunId),
+    supabase
+      .from("research_sources")
+      .select(
+        "id,research_run_id,url,canonical_url,title,status,analysis_status,error_message,created_at,updated_at,scraped_at,analysed_at",
+      )
+      .eq("research_run_id", researchRunId)
+      .order("created_at", { ascending: true }),
     supabase
       .from("research_events")
       .select("*")
@@ -494,11 +588,15 @@ export async function getRunSnapshot(researchRunId: string): Promise<ResearchRun
       .order("created_at", { ascending: true }),
   ]);
 
+  if (sources.error) throw new Error(sources.error.message);
   if (events.error) throw new Error(events.error.message);
   if (candidates.error) throw new Error(candidates.error.message);
   if (evidence.error) throw new Error(evidence.error.message);
 
-  const sourceMap = new Map(sources.map((s) => [s.id, s]));
+  const mappedSources = (sources.data as DbSnapshotSource[]).map(
+    mapSnapshotSource,
+  );
+  const sourceMap = new Map(mappedSources.map((s) => [s.id, s]));
   const mappedEvidence = (evidence.data as DbEvidence[]).map((row) => {
     const mapped = mapEvidence(row);
     const source = sourceMap.get(row.source_id);
@@ -515,7 +613,7 @@ export async function getRunSnapshot(researchRunId: string): Promise<ResearchRun
 
   return {
     run,
-    sources,
+    sources: mappedSources,
     events: (events.data as DbEvent[]).map(mapEvent),
     candidates: (candidates.data as DbCandidate[]).map(mapCandidate),
     evidence: mappedEvidence,
@@ -526,17 +624,43 @@ export async function listStaleAnalysisSources(
   researchRunId: string,
   olderThanMs = 60_000,
 ): Promise<ResearchSourceRecord[]> {
-  const sources = await listSources(researchRunId);
-  const cutoff = Date.now() - olderThanMs;
-  return sources.filter((s) => {
-    if (!["queued", "running", "pending"].includes(s.analysisStatus)) {
-      return false;
-    }
-    if (!s.markdown) {
-      return false;
-    }
-    return new Date(s.updatedAt).getTime() < cutoff || s.analysisStatus === "queued";
+  const batch = await getStaleAnalysisBatch(researchRunId, {
+    olderThanMs,
   });
+  return batch.sources;
+}
+
+export async function getStaleAnalysisBatch(
+  researchRunId: string,
+  options: { olderThanMs?: number; limit?: number } = {},
+): Promise<{ sources: ResearchSourceRecord[]; total: number }> {
+  const olderThanMs = options.olderThanMs ?? 60_000;
+  const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+  const supabase = createAdminClient();
+  let query = supabase
+    .from("research_sources")
+    .select("*", { count: "exact" })
+    .eq("research_run_id", researchRunId)
+    .in("analysis_status", ["pending", "queued", "running"])
+    .not("markdown", "is", null)
+    .neq("markdown", "")
+    .lt("updated_at", cutoff)
+    .order("updated_at", { ascending: true });
+
+  if (options.limit !== undefined) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const sources = (data as DbSource[]).map(mapSource);
+  return {
+    sources,
+    total: count ?? sources.length,
+  };
 }
 
 export { type DbCandidate, type DbEvidence };

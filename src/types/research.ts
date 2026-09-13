@@ -108,6 +108,17 @@ export type StructuredProblem = {
   assumptions: Assumption[];
   unknowns: string[];
   searchDimensions: SearchDimension[];
+  researchPreferences?: ResearchPreferences;
+};
+
+export type ResearchPreferences = {
+  industryFocus: "balanced" | "within" | "beyond";
+  evidenceTypes: Array<
+    | "scientific_papers"
+    | "patents"
+    | "industrial_cases"
+    | "technical_documentation"
+  >;
 };
 
 export type Constraint = {

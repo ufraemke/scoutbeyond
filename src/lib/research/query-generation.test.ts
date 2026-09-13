@@ -7,7 +7,10 @@ vi.mock("@/lib/gemini/client", () => ({
   generateJson: (...args: unknown[]) => generateJson(...args),
 }));
 
-import { reflectProblem } from "./query-generation";
+import {
+  generateDiversifiedQueries,
+  reflectProblem,
+} from "./query-generation";
 
 const challenge =
   "Reduce water use when cleaning sticky residue from industrial tanks.";
@@ -76,5 +79,41 @@ describe("reflectProblem", () => {
       "cross_industry",
       "emerging",
     ]);
+  });
+
+  it("passes user research priorities into diversified query generation", async () => {
+    generateJson.mockResolvedValue({
+      queries: [
+        { query: "direct one", dimension: "direct" },
+        { query: "direct two", dimension: "direct" },
+        { query: "principle one", dimension: "physical_principle" },
+        { query: "principle two", dimension: "physical_principle" },
+        { query: "adjacent one", dimension: "adjacent_application" },
+        { query: "cross one", dimension: "cross_industry" },
+        { query: "emerging one", dimension: "emerging" },
+      ],
+    });
+
+    await generateDiversifiedQueries({
+      statement: challenge,
+      goals: ["Reduce water consumption"],
+      constraints: [],
+      assumptions: [],
+      unknowns: [],
+      searchDimensions: [
+        { id: "direct", name: "Direct application" },
+      ],
+      researchPreferences: {
+        industryFocus: "beyond",
+        evidenceTypes: ["patents", "industrial_cases"],
+      },
+    });
+
+    expect(generateJson).toHaveBeenCalledWith(
+      expect.stringContaining('"industryFocus":"beyond"'),
+    );
+    expect(generateJson).toHaveBeenCalledWith(
+      expect.stringContaining('"patents"'),
+    );
   });
 });

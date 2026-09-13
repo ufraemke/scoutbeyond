@@ -6,13 +6,13 @@ import {
   appendResearchEvent,
   createScrapeJob,
   getResearchRun,
-  listSources,
+  listSourceProgress,
   refreshRunCounters,
   updateResearchRun,
   upsertDiscoveredSources,
 } from "./repository";
 import { canonicalizeUrl } from "./url";
-import { assertTransition } from "./progress";
+import { assertTransition, isSourceAnalysisTerminal } from "./progress";
 import { generateJson } from "@/lib/gemini/client";
 import { z } from "zod";
 
@@ -26,16 +26,9 @@ export async function maybeStartCounterCheck(researchRunId: string): Promise<voi
     return;
   }
 
-  const sources = await listSources(researchRunId);
+  const sources = await listSourceProgress(researchRunId);
   const pending = sources.filter(
-    (s) =>
-      s.analysisStatus === "pending" ||
-      s.analysisStatus === "queued" ||
-      s.analysisStatus === "running" ||
-      s.status === "discovered" ||
-      s.status === "scraping" ||
-      s.status === "scraped" ||
-      s.status === "analysing",
+    (source) => !isSourceAnalysisTerminal(source),
   );
 
   // Wait until every source is analysed or failed before counter-check.
@@ -43,7 +36,7 @@ export async function maybeStartCounterCheck(researchRunId: string): Promise<voi
     return;
   }
 
-  if (run.status === "counter_checking" || run.status === "synthesising" || run.status === "completed") {
+  if (run.status === "synthesising" || run.status === "completed") {
     return;
   }
 
@@ -65,44 +58,63 @@ export async function maybeStartCounterCheck(researchRunId: string): Promise<voi
     return;
   }
 
-  assertTransition(
-    run.status === "analysing" || run.status === "scraping"
-      ? "analysing"
-      : run.status,
-    "counter_checking",
-  );
+  if (run.status !== "counter_checking") {
+    assertTransition(
+      run.status === "analysing" || run.status === "scraping"
+        ? "analysing"
+        : run.status,
+      "counter_checking",
+    );
 
-  if (run.status === "scraping") {
+    if (run.status === "scraping") {
+      await updateResearchRun(researchRunId, {
+        status: "analysing",
+        phase: "analysing",
+      });
+    }
+
     await updateResearchRun(researchRunId, {
-      status: "analysing",
-      phase: "analysing",
+      status: "counter_checking",
+      phase: "counter_checking",
+    });
+
+    await appendResearchEvent({
+      researchRunId,
+      eventType: "counter_check_started",
+      message: `Counter-checking ${candidates.length} provisional candidates.`,
     });
   }
 
-  await updateResearchRun(researchRunId, {
-    status: "counter_checking",
-    phase: "counter_checking",
-  });
+  const { data: existingJobs, error: jobsError } = await supabase
+    .from("scrape_jobs")
+    .select("candidate_id,status")
+    .eq("research_run_id", researchRunId)
+    .eq("phase", "counter_check");
+  if (jobsError) {
+    throw new Error(jobsError.message);
+  }
+  const candidatesWithJobs = new Set(
+    (existingJobs ?? [])
+      .map((job) => job.candidate_id)
+      .filter((candidateId): candidateId is string => Boolean(candidateId)),
+  );
+  const candidatesToStart = candidates.filter(
+    (candidate) => !candidatesWithJobs.has(candidate.id),
+  );
 
-  await appendResearchEvent({
-    researchRunId,
-    eventType: "counter_check_started",
-    message: `Counter-checking ${candidates.length} provisional candidates.`,
-  });
-
-  for (const candidate of candidates) {
+  const results = await Promise.all(
+    candidatesToStart.map(async (candidate) => {
     const queries = await buildCounterQueries(candidate.name, candidate.principle);
-    const urls: string[] = [];
-    for (const query of queries) {
-      try {
-        const results = await searchWeb(query, 3);
-        for (const result of results) {
-          urls.push(result.url);
-        }
-      } catch (error) {
-        console.error("[counter-check] search failed", error);
+    const searches = await Promise.allSettled(
+      queries.map((query) => searchWeb(query, 3)),
+    );
+    const urls = searches.flatMap((result) => {
+      if (result.status === "fulfilled") {
+        return result.value.map((item) => item.url);
       }
-    }
+      console.error("[counter-check] search failed", result.reason);
+      return [];
+    });
 
     const unique = [...new Map(urls.map((u) => [canonicalizeUrl(u), u])).entries()].map(
       ([canonicalUrl, url]) => ({
@@ -120,7 +132,7 @@ export async function maybeStartCounterCheck(researchRunId: string): Promise<voi
         .from("live_candidates")
         .update({ verification_state: "verified" })
         .eq("id", candidate.id);
-      continue;
+      return false;
     }
 
     await upsertDiscoveredSources(researchRunId, unique);
@@ -140,9 +152,30 @@ export async function maybeStartCounterCheck(researchRunId: string): Promise<voi
       candidateId: candidate.id,
       urls: unique.map((u) => u.url),
     });
-  }
+    return true;
+    }),
+  );
 
   await refreshRunCounters(researchRunId);
+
+  const allExistingJobsFinished =
+    (existingJobs?.length ?? 0) > 0 &&
+    (existingJobs ?? []).every((job) =>
+      ["completed", "failed"].includes(job.status),
+    );
+
+  if (candidatesToStart.length === 0 && allExistingJobsFinished) {
+    await finalizeRun(researchRunId);
+    return;
+  }
+
+  if (
+    candidatesToStart.length > 0 &&
+    results.every((jobCreated) => !jobCreated) &&
+    candidatesWithJobs.size === 0
+  ) {
+    await finalizeRun(researchRunId);
+  }
 }
 
 export async function finalizeRun(researchRunId: string): Promise<void> {
