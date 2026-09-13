@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 const STEPS = [
@@ -20,20 +21,31 @@ export function AppHeader({
   onStepChange?: (step: number) => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#e5e5e2] bg-white px-8">
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-[#e5e5e2] bg-white px-8">
+      <div className="flex min-w-0 shrink items-center gap-3 sm:gap-4">
         <Link
           href="/"
-          className="text-[17px] font-bold tracking-tight text-[#161616]"
+          className="flex shrink-0 items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176b87] focus-visible:ring-offset-2"
+          aria-label="ScoutBeyond home"
         >
-          ScoutBeyond
+          <Image
+            src="/ScoutBeyond Logo.png"
+            alt="ScoutBeyond"
+            width={180}
+            height={40}
+            className="h-10 w-auto"
+            priority
+          />
         </Link>
-        <span className="rounded-full bg-[#eaf3f6] px-2.5 py-0.5 text-[11px] font-semibold text-[#176b87]">
+        <span className="hidden rounded-full bg-[#eaf3f6] px-2.5 py-0.5 text-[11px] font-semibold text-[#176b87] sm:inline-flex">
           Technology Scanner
         </span>
       </div>
 
-      <nav aria-label="Research steps" className="flex items-center gap-2">
+      <nav
+        aria-label="Research steps"
+        className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2"
+      >
         {STEPS.map((step) => {
           const available = step.num <= maxAvailableStep;
           const className = `flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-all ${
