@@ -17,6 +17,7 @@ export function CandidateComparison({
   shortlistedIds,
   preliminary,
   onToggleShortlist,
+  onOpenCandidate,
   onBack,
   onContinue,
 }: {
@@ -26,6 +27,7 @@ export function CandidateComparison({
   shortlistedIds: string[];
   preliminary: boolean;
   onToggleShortlist: (candidateId: string) => void;
+  onOpenCandidate: (candidate: LiveCandidateRecord) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -60,33 +62,35 @@ export function CandidateComparison({
         </div>
       ) : null}
 
-      <div className="mt-6 rounded-xl border border-[#e5e5e2] bg-white p-4">
-        <p className="text-[11px] font-bold uppercase tracking-[0.07em] text-[#8a8a8a]">
-          Decision context
-        </p>
-        <p className="mt-2 text-[14px] font-medium">{problem.statement}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {problem.goals.map((goal) => (
-            <span
-              key={goal}
-              className="rounded-md bg-[#eaf3f6] px-2 py-1 text-[11px] text-[#12566c]"
-            >
-              Goal: {goal}
-            </span>
-          ))}
-          {problem.constraints.map((constraint) => (
-            <span
-              key={constraint.id}
-              className="rounded-md bg-[#f0f0ec] px-2 py-1 text-[11px] text-[#626262]"
-            >
-              {constraint.importance === "must" ? "Must" : "Constraint"}:{" "}
-              {constraint.description}
-            </span>
-          ))}
-        </div>
+      <div className="mt-6 rounded-[10px] border border-[#e5e5e2] bg-white px-4 py-3">
+        <p className="text-[13px] font-medium">{problem.statement}</p>
+        <details className="mt-2 text-[11px] text-[#626262]">
+          <summary className="cursor-pointer font-semibold text-[#176b87]">
+            More decision context
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {problem.goals.map((goal) => (
+              <span
+                key={goal}
+                className="rounded-[6px] bg-[#eaf3f6] px-2 py-1 text-[#12566c]"
+              >
+                Goal: {goal}
+              </span>
+            ))}
+            {problem.constraints.map((constraint) => (
+              <span
+                key={constraint.id}
+                className="rounded-[6px] bg-[#f0f0ec] px-2 py-1"
+              >
+                {constraint.importance === "must" ? "Must" : "Constraint"}:{" "}
+                {constraint.description}
+              </span>
+            ))}
+          </div>
+        </details>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-[#e5e5e2] bg-white">
+      <div className="mt-6 overflow-hidden rounded-[14px] border border-[#e5e5e2] bg-white">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse text-left text-[13px]">
             <thead>
@@ -121,41 +125,54 @@ export function CandidateComparison({
                 value={(candidate) => formatMaturity(candidate)}
               />
               <ComparisonRow
-                label="Potential benefits"
+                label="Main benefit"
                 candidates={candidates}
                 value={(candidate) =>
                   candidate.benefits.length
-                    ? candidate.benefits.join("; ")
+                    ? candidate.benefits[0]
                     : "Unknown"
                 }
               />
               <ComparisonRow
-                label="Limitations"
-                candidates={candidates}
-                value={(candidate) =>
-                  candidate.limitations.length
-                    ? candidate.limitations.join("; ")
-                    : "Unknown"
-                }
-              />
-              <ComparisonRow
-                label="Uncertainty"
-                candidates={candidates}
-                value={(candidate) => formatUncertainties(candidate)}
-              />
-              <ComparisonRow
-                label="Evidence"
+                label="Main limitation / uncertainty"
                 candidates={candidates}
                 value={(candidate) => {
+                  if (candidate.limitations.length > 0) {
+                    return candidate.limitations[0];
+                  }
+                  return formatUncertainties(candidate);
+                }}
+              />
+              <tr>
+                <th className="p-4 font-semibold text-[#161616]">Evidence</th>
+                {candidates.map((candidate) => {
                   const linked = evidence.filter(
                     (item) => item.candidateId === candidate.id,
                   );
                   const sources = new Set(
                     linked.map((item) => item.sourceId),
                   ).size;
-                  return `${candidate.evidenceQuality ?? "Not assessed"} · ${sources} source${sources === 1 ? "" : "s"} · ${linked.length} finding${linked.length === 1 ? "" : "s"}`;
-                }}
-              />
+                  return (
+                    <td
+                      key={candidate.id}
+                      className="p-4 align-top text-[#626262]"
+                    >
+                      <p>
+                        {sources} source{sources === 1 ? "" : "s"} ·{" "}
+                        {linked.length} finding
+                        {linked.length === 1 ? "" : "s"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => onOpenCandidate(candidate)}
+                        className="mt-1 text-[12px] font-semibold text-[#176b87] hover:underline"
+                      >
+                        View evidence →
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
               <tr className="bg-[#fafaf8]">
                 <th className="p-4 font-semibold">Investigate further</th>
                 {candidates.map((candidate) => (
@@ -179,7 +196,7 @@ export function CandidateComparison({
         </div>
       </div>
 
-      <div className="sticky bottom-4 z-20 mt-6 flex items-center justify-between gap-4 rounded-xl bg-[#161616] px-5 py-3 text-white shadow-lg">
+      <div className="sticky bottom-4 z-20 mt-6 flex items-center justify-between gap-4 rounded-[10px] bg-[#161616] px-5 py-3 text-white">
         <p className="text-[13px]">
           <span className="font-semibold">{shortlistedIds.length}</span>{" "}
           solution{shortlistedIds.length === 1 ? "" : "s"} selected for the

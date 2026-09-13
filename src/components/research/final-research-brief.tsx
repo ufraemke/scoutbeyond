@@ -99,7 +99,7 @@ export function FinalResearchBrief({
         </div>
       ) : null}
 
-      <article className="print-report mx-auto mt-8 max-w-[880px] rounded-xl border border-[#e5e5e2] bg-white p-10 shadow-sm">
+      <article className="print-report mx-auto mt-8 max-w-[880px] rounded-[14px] border border-[#e5e5e2] bg-white p-8 sm:p-10">
         <header className="border-b-2 border-[#161616] pb-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#626262]">
             ScoutBeyond Technology Brief

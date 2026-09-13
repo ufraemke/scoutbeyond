@@ -85,7 +85,7 @@ export default function ResearchRunPage({
         <AppHeader currentStep={view} maxAvailableStep={view} />
       </div>
 
-      <main className="mx-auto max-w-[1200px] px-8 py-10">
+      <main className="mx-auto max-w-[1120px] px-6 py-10 sm:px-8">
         {error ? (
           <div className="rounded-2xl border border-[#e5e5e2] bg-white p-6 shadow-sm">
             <h1 className="text-[24px] font-semibold">
@@ -112,7 +112,7 @@ export default function ResearchRunPage({
           <>
             {view === 3 ? (
               <>
-                <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+                <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <p className="text-[12px] font-bold uppercase tracking-wider text-[#176b87]">
                       Step 3 · Technology Discovery
@@ -121,53 +121,61 @@ export default function ResearchRunPage({
                       Candidate Technology Landscape
                     </h1>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void refetch()}
-                      className="rounded-xl border border-[#e5e5e2] bg-white px-5 py-2.5 text-[13px] font-semibold shadow-sm hover:bg-[#f7f7f5]"
-                    >
-                      Refresh
-                    </button>
-                    {!["completed", "failed"].includes(snapshot.run.status) ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleResume()}
-                        className="rounded-xl border border-[#e5e5e2] bg-white px-5 py-2.5 text-[13px] font-semibold shadow-sm hover:bg-[#f7f7f5]"
-                      >
-                        Resume stalled analysis
-                      </button>
-                    ) : null}
-                    <Link
-                      href="/"
-                      className="rounded-xl bg-[#161616] px-5 py-2.5 text-[13px] font-medium text-white hover:bg-[#333]"
-                    >
-                      New Scan
-                    </Link>
-                  </div>
-                </div>
-                {resumeMessage ? (
-                  <p
-                    aria-live="polite"
-                    className="mb-4 rounded-lg border border-[#e5e5e2] bg-white px-3 py-2 text-[12px] text-[#626262]"
+                  <Link
+                    href="/"
+                    className="rounded-[9px] border border-[#d5d5d0] bg-white px-4 py-2 text-[12px] font-semibold hover:bg-[#f7f7f5]"
                   >
-                    {resumeMessage}
-                  </p>
-                ) : null}
+                    New scan
+                  </Link>
+                </div>
                 <ResearchProgress
                   run={snapshot.run}
                   sources={snapshot.sources}
                   connection={connection}
                 />
+                <details className="mt-3 text-[12px] text-[#626262]">
+                  <summary className="cursor-pointer font-semibold text-[#176b87]">
+                    Research details
+                  </summary>
+                  <div className="mt-3 rounded-[10px] border border-[#e5e5e2] bg-white p-4">
+                    <p>Live connection: {connection}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void refetch()}
+                        className="rounded-[8px] border border-[#d5d5d0] px-3 py-1.5 font-semibold hover:bg-[#f7f7f5]"
+                      >
+                        Refresh data
+                      </button>
+                      {!["completed", "failed"].includes(
+                        snapshot.run.status,
+                      ) ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleResume()}
+                          className="rounded-[8px] border border-[#d5d5d0] px-3 py-1.5 font-semibold hover:bg-[#f7f7f5]"
+                        >
+                          Resume stalled analysis
+                        </button>
+                      ) : null}
+                    </div>
+                    {resumeMessage ? (
+                      <p aria-live="polite" className="mt-3">
+                        {resumeMessage}
+                      </p>
+                    ) : null}
+                    <ResearchEventList events={snapshot.events} />
+                  </div>
+                </details>
                 <CandidateLandscape
                   candidates={snapshot.candidates}
                   evidence={snapshot.evidence}
                   selectedIds={selectedIds}
+                  completed={snapshot.run.status === "completed"}
                   onToggleCandidate={toggleCandidate}
                   onCompare={() => setView(4)}
                   onOpenCandidate={setActiveCandidate}
                 />
-                <ResearchEventList events={snapshot.events} />
               </>
             ) : null}
 
@@ -179,6 +187,7 @@ export default function ResearchRunPage({
                 shortlistedIds={shortlistedIds}
                 preliminary={preliminary}
                 onToggleShortlist={toggleShortlist}
+                onOpenCandidate={setActiveCandidate}
                 onBack={() => setView(3)}
                 onContinue={() => setView(5)}
               />
