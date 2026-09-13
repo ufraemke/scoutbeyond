@@ -114,19 +114,22 @@ example `https://scoutbeyond.vercel.app`, without a trailing slash.
 
 1. Create a Supabase project.
 2. Enable **Anonymous sign-ins** under Authentication settings.
-3. Copy the project URL, public anon/publishable key, and server-only service
+3. Prefer an **asymmetric JWT signing key** (ECC/RSA) under Auth → JWT Keys so
+   API routes can verify sessions locally via `getClaims()` without calling
+   `GET /auth/v1/user` on every request.
+4. Copy the project URL, public anon/publishable key, and server-only service
    role/secret key into `.env.local` and the corresponding deployment
    environment variables.
-4. Run the migrations in timestamp order:
+5. Run the migrations in timestamp order:
    - `supabase/migrations/20260312220000_live_research.sql`
    - `supabase/migrations/20260913014000_live_evidence_realtime.sql`
-5. Confirm the `supabase_realtime` publication contains:
+6. Confirm the `supabase_realtime` publication contains:
    - `research_runs`
    - `research_sources`
    - `research_events`
    - `live_candidates`
    - `live_evidence`
-6. Keep Row Level Security enabled. The migration policies restrict each
+7. Keep Row Level Security enabled. The migration policies restrict each
    anonymous visitor to their own research runs.
 
 Health check: `/api/health/supabase`.
@@ -140,6 +143,8 @@ new installation.
 - Apply both Supabase migrations before deploying the new frontend.
 - Set every environment variable in the production deployment.
 - Set `NEXT_PUBLIC_APP_URL` to the production origin.
+- Use an asymmetric Supabase JWT signing key so research routes avoid
+  per-request Auth `/user` round-trips.
 - Configure Firecrawl to use the same webhook secret as
   `FIRECRAWL_WEBHOOK_SECRET`.
 - Confirm `POST /api/firecrawl/webhook` returns `2xx`.

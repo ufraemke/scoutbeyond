@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { startResearch } from "@/lib/research/start-research";
 import { ResearchStartInputSchema } from "@/lib/research/schemas";
+import { requireOwner } from "@/lib/supabase/require-owner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,26 +20,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const auth = await requireOwner({ route: "POST /api/research/start" });
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "Authentication required. Sign in anonymously from the client before starting research.",
-        },
-        { status: 401 },
-      );
-    }
-
     const run = await startResearch({
-      ownerId: user.id,
+      ownerId: auth.ownerId,
       challenge: parsed.data.challenge,
       structuredProblem: parsed.data.structuredProblem,
     });

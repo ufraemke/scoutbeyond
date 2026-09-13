@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { reflectProblem } from "@/lib/research/query-generation";
 import { ResearchChallengeSchema } from "@/lib/research/schemas";
+import { requireOwner } from "@/lib/supabase/require-owner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,21 +19,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message:
-          "Authentication required. Refresh the page and try reviewing the brief again.",
-      },
-      { status: 401 },
-    );
+  const auth = await requireOwner({ route: "POST /api/research/refine" });
+  if (!auth.ok) {
+    return auth.response;
   }
 
   try {

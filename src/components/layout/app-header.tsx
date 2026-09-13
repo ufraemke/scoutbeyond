@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import type { MouseEventHandler } from "react";
 
 const STEPS = [
   { num: 1, label: "Intake" },
@@ -21,7 +22,7 @@ export function AppHeader({
   currentStep: number;
   maxAvailableStep?: number;
   onStepChange?: (step: number) => void;
-  onHome?: () => void;
+  onHome?: MouseEventHandler<HTMLAnchorElement>;
   showSteps?: boolean;
 }) {
   return (
