@@ -14,7 +14,8 @@ export function ResearchProgress({
     (s) => s.status === "scraping" || s.status === "analysing",
   );
   const knownTotal = run.sourcesFound > 0;
-  const reviewed = run.sourcesScraped;
+  const retrieved = run.sourcesScraped;
+  const finished = run.sourcesAnalysed + run.sourcesFailed;
 
   return (
     <section
@@ -46,17 +47,25 @@ export function ResearchProgress({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+      <div className="mt-5 grid gap-4 sm:grid-cols-4">
         <Stat
           label="Sources found"
           value={knownTotal ? String(run.sourcesFound) : "—"}
         />
         <Stat
-          label="Sources reviewed"
+          label="Sources retrieved"
           value={
             knownTotal
-              ? `${reviewed} / ${run.sourcesFound}`
+              ? `${retrieved} / ${run.sourcesFound}`
               : String(run.sourcesScraped)
+          }
+        />
+        <Stat
+          label="Sources analysed"
+          value={
+            knownTotal
+              ? `${run.sourcesAnalysed} / ${run.sourcesFound}`
+              : String(run.sourcesAnalysed)
           }
         />
         <Stat label="Candidates" value={String(run.candidatesCount)} />
@@ -67,7 +76,8 @@ export function ResearchProgress({
           <progress
             className="h-2 w-full overflow-hidden rounded bg-[var(--border)]"
             max={run.sourcesFound}
-            value={Math.min(reviewed, run.sourcesFound)}
+            value={Math.min(finished, run.sourcesFound)}
+            aria-label="Sources with completed or failed analysis"
           />
         </div>
       ) : null}

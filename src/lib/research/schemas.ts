@@ -36,6 +36,21 @@ export const StructuredProblemSchema = z.object({
     )
     .min(1)
     .max(10),
+  researchPreferences: z
+    .object({
+      industryFocus: z.enum(["balanced", "within", "beyond"]),
+      evidenceTypes: z
+        .array(
+          z.enum([
+            "scientific_papers",
+            "patents",
+            "industrial_cases",
+            "technical_documentation",
+          ]),
+        )
+        .max(4),
+    })
+    .optional(),
 });
 
 export const ResearchChallengeSchema = z.object({

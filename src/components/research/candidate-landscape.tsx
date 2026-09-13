@@ -16,9 +16,17 @@ const CATEGORY_LABEL: Record<CandidateCategory, string> = {
 export function CandidateLandscape({
   candidates,
   evidence,
+  selectedIds,
+  onToggleCandidate,
+  onCompare,
+  onOpenCandidate,
 }: {
   candidates: LiveCandidateRecord[];
   evidence: LiveEvidenceRecord[];
+  selectedIds: string[];
+  onToggleCandidate: (candidateId: string) => void;
+  onCompare: () => void;
+  onOpenCandidate: (candidate: LiveCandidateRecord) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"all" | CandidateCategory>("all");
   const filtered =
@@ -67,10 +75,16 @@ export function CandidateLandscape({
           const linked = evidence.filter(
             (item) => item.candidateId === candidate.id,
           );
+          const sourceCount = new Set(linked.map((item) => item.sourceId)).size;
+          const selected = selectedIds.includes(candidate.id);
           return (
             <article
               key={candidate.id}
-              className="rounded-2xl border border-[#e5e5e2] bg-white p-5 transition hover:border-[#bbb]"
+              className={`rounded-2xl border bg-white p-5 transition ${
+                selected
+                  ? "border-[#176b87] ring-2 ring-[#eaf3f6]"
+                  : "border-[#e5e5e2] hover:border-[#bbb]"
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -94,9 +108,18 @@ export function CandidateLandscape({
                     {candidate.principle}
                   </p>
                 </div>
-                <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.04em] text-[#8a8a8a]">
-                  {candidate.verificationState}
-                </span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.04em] text-[#8a8a8a]">
+                    {candidate.verificationState}
+                  </span>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${candidate.name} for comparison`}
+                    checked={selected}
+                    onChange={() => onToggleCandidate(candidate.id)}
+                    className="h-5 w-5 rounded border-[#d5d5d0] accent-[#176b87]"
+                  />
+                </div>
               </div>
 
               {candidate.relevance ? (
@@ -120,10 +143,19 @@ export function CandidateLandscape({
               </div>
 
               <div className="mt-4 border-t border-[#f0f0ec] pt-3">
-                <p className="text-[12px] font-semibold text-[#161616]">
-                  {linked.length} source-backed finding
-                  {linked.length === 1 ? "" : "s"}
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[12px] font-semibold text-[#161616]">
+                    {sourceCount} source{sourceCount === 1 ? "" : "s"} ·{" "}
+                    {linked.length} finding{linked.length === 1 ? "" : "s"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onOpenCandidate(candidate)}
+                    className="text-[12px] font-semibold text-[#176b87] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#176b87]"
+                  >
+                    View details & evidence →
+                  </button>
+                </div>
                 <div className="mt-2 space-y-2">
                   {linked.slice(0, 2).map((item) => (
                     <div key={item.id} className="text-[12px] text-[#626262]">
@@ -147,6 +179,23 @@ export function CandidateLandscape({
           );
         })}
       </div>
+
+      {selectedIds.length > 0 ? (
+        <div className="sticky bottom-4 z-20 mt-6 flex items-center justify-between gap-4 rounded-xl bg-[#161616] px-5 py-3 text-white shadow-lg">
+          <p className="text-[13px]">
+            <span className="font-semibold">{selectedIds.length}</span>{" "}
+            solution{selectedIds.length === 1 ? "" : "s"} selected
+          </p>
+          <button
+            type="button"
+            disabled={selectedIds.length < 2}
+            onClick={onCompare}
+            className="rounded-lg bg-white px-4 py-2 text-[12px] font-semibold text-[#161616] transition hover:bg-[#f0f0ec] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Compare selected →
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

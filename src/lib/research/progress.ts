@@ -1,4 +1,8 @@
-import type { ResearchRunStatus } from "@/types";
+import type {
+  ResearchRunStatus,
+  ResearchSourceStatus,
+  SourceAnalysisStatus,
+} from "@/types";
 
 const LEGAL_TRANSITIONS: Record<ResearchRunStatus, ResearchRunStatus[]> = {
   queued: ["searching", "failed"],
@@ -28,6 +32,52 @@ export function assertTransition(
   if (!canTransition(from, to)) {
     throw new Error(`Illegal research run transition: ${from} → ${to}`);
   }
+}
+
+export type TerminalSourceAnalysisStatus = Extract<
+  SourceAnalysisStatus,
+  "completed" | "failed" | "skipped"
+>;
+
+/**
+ * Keeps the source and analysis state machines aligned. Every terminal
+ * analysis outcome must also move the source itself to a terminal state.
+ */
+export function terminalSourceAnalysisPatch(
+  analysisStatus: TerminalSourceAnalysisStatus,
+  options: { errorMessage?: string | null; timestamp?: string } = {},
+): {
+  analysis_status: TerminalSourceAnalysisStatus;
+  status: Extract<ResearchSourceStatus, "analysed" | "failed">;
+  analysed_at?: string;
+  error_message?: string | null;
+} {
+  if (analysisStatus === "completed") {
+    return {
+      analysis_status: analysisStatus,
+      status: "analysed",
+      analysed_at: options.timestamp ?? new Date().toISOString(),
+    };
+  }
+
+  return {
+    analysis_status: analysisStatus,
+    status: "failed",
+    error_message: options.errorMessage ?? null,
+  };
+}
+
+export function isSourceAnalysisTerminal(input: {
+  status: ResearchSourceStatus;
+  analysisStatus: SourceAnalysisStatus;
+}): boolean {
+  return (
+    input.status === "analysed" ||
+    input.status === "failed" ||
+    input.analysisStatus === "completed" ||
+    input.analysisStatus === "failed" ||
+    input.analysisStatus === "skipped"
+  );
 }
 
 export function phaseLabel(status: ResearchRunStatus): string {

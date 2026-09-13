@@ -3,6 +3,7 @@
 import type {
   Assumption,
   Constraint,
+  ResearchPreferences,
   SearchDimension,
   StructuredProblem,
 } from "@/types";
@@ -82,6 +83,18 @@ export function EditableResearchBrief({ value, onChange }: Props) {
           values={value.searchDimensions}
           onChange={(searchDimensions) =>
             onChange({ ...value, searchDimensions })
+          }
+        />
+
+        <ResearchPreferencesEditor
+          value={
+            value.researchPreferences ?? {
+              industryFocus: "balanced",
+              evidenceTypes: [],
+            }
+          }
+          onChange={(researchPreferences) =>
+            onChange({ ...value, researchPreferences })
           }
         />
       </div>
@@ -411,6 +424,97 @@ function SearchDimensionEditor({
       >
         + Add search dimension
       </button>
+    </EditorSurface>
+  );
+}
+
+const EVIDENCE_OPTIONS: Array<{
+  value: ResearchPreferences["evidenceTypes"][number];
+  label: string;
+}> = [
+  { value: "scientific_papers", label: "Scientific papers" },
+  { value: "patents", label: "Patents" },
+  { value: "industrial_cases", label: "Industrial cases" },
+  { value: "technical_documentation", label: "Technical documentation" },
+];
+
+function ResearchPreferencesEditor({
+  value,
+  onChange,
+}: {
+  value: ResearchPreferences;
+  onChange: (value: ResearchPreferences) => void;
+}) {
+  return (
+    <EditorSurface
+      title="Research Priorities"
+      description="Priorities change emphasis while the search still covers every required dimension."
+    >
+      <fieldset>
+        <legend className="text-[12px] font-semibold text-[#626262]">
+          Industry focus
+        </legend>
+        <div className="mt-2 space-y-2">
+          {(
+            [
+              ["balanced", "Balanced"],
+              ["within", "Within your industry"],
+              ["beyond", "Beyond your industry"],
+            ] as const
+          ).map(([option, label]) => (
+            <label
+              key={option}
+              className="flex cursor-pointer items-center gap-2 text-[12px] text-[#161616]"
+            >
+              <input
+                type="radio"
+                name="industry-focus"
+                value={option}
+                checked={value.industryFocus === option}
+                onChange={() =>
+                  onChange({ ...value, industryFocus: option })
+                }
+                className="h-4 w-4 accent-[#176b87]"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="mt-5 border-t border-[#f0f0ec] pt-4">
+        <legend className="text-[12px] font-semibold text-[#626262]">
+          Evidence to prioritize
+        </legend>
+        <div className="mt-2 space-y-2">
+          {EVIDENCE_OPTIONS.map((option) => {
+            const checked = value.evidenceTypes.includes(option.value);
+            return (
+              <label
+                key={option.value}
+                className="flex cursor-pointer items-center gap-2 text-[12px] text-[#161616]"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() =>
+                    onChange({
+                      ...value,
+                      evidenceTypes: checked
+                        ? value.evidenceTypes.filter(
+                            (item) => item !== option.value,
+                          )
+                        : [...value.evidenceTypes, option.value],
+                    })
+                  }
+                  className="h-4 w-4 rounded accent-[#176b87]"
+                />
+                {option.label}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
     </EditorSurface>
   );
 }

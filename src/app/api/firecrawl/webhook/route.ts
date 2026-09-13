@@ -7,7 +7,7 @@ import {
 import { maybeStartCounterCheck } from "@/lib/research/counter-check";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const rawBody = await request.text();

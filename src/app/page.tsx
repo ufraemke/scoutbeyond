@@ -18,6 +18,10 @@ type ResearchMode = "live" | "prepared" | null;
 type CandidateFilter = "all" | CandidateCategory;
 type PendingAction = "refining" | "starting" | null;
 type ReflectionMode = "gemini" | "fallback";
+type ClarificationPrompt = {
+  question: string;
+  options: string[];
+};
 
 export default function Home() {
   const router = useRouter();
@@ -32,6 +36,8 @@ export default function Home() {
   const [reflectionWarning, setReflectionWarning] = useState<string | null>(
     null,
   );
+  const [clarification, setClarification] =
+    useState<ClarificationPrompt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CandidateFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([
@@ -78,10 +84,18 @@ export default function Home() {
     setLiveBrief(null);
     setReflectionMode(null);
     setReflectionWarning(null);
+    setClarification(null);
     setError(null);
   }
 
-  async function handleReviewBrief() {
+  async function handleReviewBrief(challengeOverride?: string) {
+    const challenge = (challengeOverride ?? rawInput).trim();
+    const clarificationPrompt = buildClarificationPrompt(challenge);
+    if (!challengeOverride && clarificationPrompt) {
+      setClarification(clarificationPrompt);
+      return;
+    }
+
     setPendingAction("refining");
     setError(null);
 
@@ -96,7 +110,7 @@ export default function Home() {
       const response = await fetch("/api/research/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challenge: rawInput.trim() }),
+        body: JSON.stringify({ challenge }),
       });
       const json = (await response.json()) as {
         ok: boolean;
@@ -125,6 +139,13 @@ export default function Home() {
     } finally {
       setPendingAction(null);
     }
+  }
+
+  function applyClarification(answer: string) {
+    const clarified = `${rawInput.trim()}. Primary objective: ${answer}.`;
+    setRawInput(clarified);
+    setClarification(null);
+    void handleReviewBrief(clarified);
   }
 
   async function handleConfirmResearch() {
@@ -247,6 +268,7 @@ ${selectedCandidates
                   setLiveBrief(null);
                   setReflectionMode(null);
                   setReflectionWarning(null);
+                  setClarification(null);
                   setError(null);
                   setMaxStep(1);
                 }}
@@ -826,8 +848,62 @@ ${selectedCandidates
           </div>
         </Modal>
       ) : null}
+
+      {clarification ? (
+        <Modal
+          title="Please clarify your request"
+          onClose={() => setClarification(null)}
+        >
+          <div className="space-y-3 p-6">
+            <p className="text-[14px] leading-relaxed text-[#626262]">
+              {clarification.question}
+            </p>
+            {clarification.options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => applyClarification(option)}
+                className="block w-full rounded-xl border border-[#e5e5e2] bg-white px-4 py-3 text-left text-[13px] font-medium text-[#161616] transition hover:border-[#176b87] hover:bg-[#eaf3f6]"
+              >
+                {option}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setClarification(null)}
+              className="text-[12px] font-semibold text-[#176b87] hover:underline"
+            >
+              None of these — revise the problem statement
+            </button>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
+}
+
+function buildClarificationPrompt(
+  challenge: string,
+): ClarificationPrompt | null {
+  const words = challenge.match(/[A-Za-zÀ-ÿ0-9-]+/g) ?? [];
+  const hasSpecificOutcome =
+    /\b(reduce|increase|prevent|remove|detect|measure|replace|clean|improve\s+(?:the\s+)?(?:accuracy|quality|yield|speed|efficiency))\b/i.test(
+      challenge,
+    );
+
+  if (words.length >= 7 || hasSpecificOutcome) {
+    return null;
+  }
+
+  return {
+    question:
+      "Which outcome is most important? This helps ScoutBeyond search for the right physical solution principles.",
+    options: [
+      "Reduce resource or energy consumption",
+      "Reduce processing or cycle time",
+      "Improve technical performance or reliability",
+    ],
+  };
 }
 
 function normalizeStructuredProblem(

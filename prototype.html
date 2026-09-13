@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ScoutBeyond — Technology Scouting</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+:root{
+  --bg:#f7f7f5;--surface:#fff;--text:#151515;--muted:#6d6d6d;
+  --line:#e3e3df;--soft:#f0f0ec;--accent:#151515;--blue:#315bd6;
+  --blue-soft:#eef2ff;--green:#23734d;--green-soft:#edf8f1;
+  --radius:14px;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.5 Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}button{cursor:pointer; font-family: inherit;}
+.app{min-height:100vh}.topbar{height:68px;background:#fff;border-bottom:1px solid var(--line);
+display:flex;align-items:center;justify-content:space-between;padding:0 34px;position:sticky;top:0;z-index:5}
+.logo{font-size:19px;font-weight:750;letter-spacing:-.3px; cursor:pointer;}
+.progress{display:flex;gap:7px;align-items:center}
+.progress span{width:32px;height:4px;border-radius:99px;background:#ddd}.progress span.on{background:#151515}
+.content{max-width:1080px;margin:auto;padding:52px 30px 80px}.screen{display:none}.screen.active{display:block}
+.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:11px;font-weight:750;color:var(--muted);margin-bottom:9px}
+h1{font-size:34px;line-height:1.12;letter-spacing:-.8px;margin:0 0 10px}
+h2{font-size:19px;margin:0 0 5px}h3{font-size:15px;margin:0 0 6px}p{margin:0;color:var(--muted)}
+.sub{max-width:760px}.panel{margin-top:28px;background:#fff;border:1px solid var(--line);
+border-radius:var(--radius);padding:25px}.panel-title{font-weight:700;font-size:13px;margin-bottom:9px}
+textarea{width:100%;min-height:150px;border:1px solid #d6d6d1;border-radius:11px;padding:15px;
+resize:vertical;outline:0;background:#fff;transition:border-color 0.2s;}textarea:focus{border-color:#aaa}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.choice{padding:13px;text-align:left;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:10px}
+.choice:hover{border-color:#aaa;background:#fafafa}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px}.btn{border:1px solid var(--line);
+background:#fff;color:#333;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:6px;}
+.btn.primary{background:#151515;border-color:#151515;color:#fff}.btn:hover:not(:disabled){filter:brightness(.97)}
+.btn:disabled{opacity:0.4; cursor:not-allowed; filter:none;}
+.hidden{display:none !important;}
+
+/* Landing Page Styles */
+.landing-hero{text-align:center; padding: 100px 20px; max-width: 700px; margin: 0 auto;}
+.landing-hero h1{font-size:42px; letter-spacing:-1.2px; margin-bottom:16px;}
+.landing-hero p{font-size:18px; margin-bottom:32px;}
+
+/* Modal Overlay Styles (Used for Evidence and Helper) */
+.modal-overlay{position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:100; opacity:0; pointer-events:none; transition: opacity 0.2s;}
+.modal-overlay.active{opacity:1; pointer-events:auto;}
+.modal-content{background:#fff; width:100%; max-width:700px; max-height:85vh; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.2);}
+.modal-header{padding:20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+.modal-body{padding:20px; overflow-y:auto; background:var(--bg); flex:1;}
+
+/* Specific Modal content formatting */
+.source-item{background:#fff; border:1px solid var(--line); border-radius:10px; padding:15px; margin-bottom:12px;}
+.source-meta{font-size:11px; color:var(--muted); margin-bottom:6px; display:flex; gap:10px;}
+.source-meta span{background:var(--soft); padding:2px 6px; border-radius:4px;}
+.source-title{font-size:14px; font-weight:700; color:var(--blue); margin-bottom:6px; cursor:pointer;}
+.source-title:hover{text-decoration:underline;}
+.source-snippet{font-size:12px; color:var(--text); border-left:3px solid var(--line); padding-left:10px; margin-top:8px;}
+
+/* Skeleton Loading Animation */
+@keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+.skeleton { background: #f6f7f8; background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%); background-repeat: no-repeat; background-size: 1000px 100%; animation-duration: 1.5s; animation-fill-mode: forwards; animation-iteration-count: infinite; animation-name: shimmer; animation-timing-function: linear; border-radius: 4px;}
+.skel-text { height: 12px; margin-bottom: 8px; width: 100%; }
+.skel-title { height: 16px; margin-bottom: 12px; width: 70%; }
+.skel-badge { height: 18px; width: 60px; margin-bottom: 8px; display:inline-block; border-radius:10px; margin-right:6px;}
+.skel-item { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 15px; margin-bottom: 12px; }
+
+/* Buttons */
+.source-btn{background:none; border:none; color:var(--blue); font-size:10px; font-weight:700; padding:0; margin:0;}
+.source-btn:hover{text-decoration:underline;}
+
+/* PDF Document Preview Styles */
+.doc-preview{background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding:40px; text-align:left; max-width:800px; margin: 0 auto 30px;}
+.doc-header{border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 25px;}
+.doc-header h2{font-size:24px; margin:0; color:#000; letter-spacing: -0.5px;}
+.doc-section{margin-bottom:25px;}
+.doc-section h3{font-size:14px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:10px; border-bottom:1px solid var(--line); padding-bottom:5px;}
+.doc-text{font-size:13px; line-height:1.6; color:#333;}
+.doc-biblio-item{font-size:12px; margin-bottom:10px; padding-left:15px; text-indent:-15px; line-height:1.4;}
+
+/* Shared core components */
+.ref-layout{display:grid;grid-template-columns:1.45fr .75fr;gap:18px;margin-top:28px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius)}
+.card-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:15px}
+.card-body{padding:18px 20px}.edit{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 11px;font-size:11px;font-weight:700}.edit:hover{background:var(--soft)}
+.ref-row{padding:14px 0;border-bottom:1px solid #eee}.ref-row:last-child{border-bottom:0}
+.ref-label{text-transform:uppercase;letter-spacing:.07em;font-size:10px;font-weight:750;color:#888;margin-bottom:5px}
+.ref-value{font-size:13px}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px}.chip.editable:hover{border-color:#aaa}
+.scope-list{display:grid;gap:12px}
+.scope-item{padding:14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.scope-item strong{display:block;font-size:12px;}
+.priority-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.priority-item{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:8px 12px;background:var(--soft);border-radius:8px}
+.priority-toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--muted);font-weight:700}
+.priority-toggle input{margin:0;cursor:pointer}
+.tabs{display:flex;gap:28px;border-bottom:1px solid var(--line);margin-top:25px}
+.tab{border:0;background:none;padding:11px 2px 12px;color:var(--muted);font-weight:700;border-bottom:2px solid transparent}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.landscape-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-top:18px}
+.solution{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px;cursor:pointer}
+.solution.selected{border-color:#8398df;box-shadow:0 0 0 2px var(--blue-soft)}
+.sol-top{display:flex;justify-content:space-between;gap:15px}.check{width:18px;height:18px;border:1px solid #bbb;border-radius:5px;display:grid;place-items:center;font-size:11px;flex:none}.selected .check{background:#315bd6;color:#fff;border-color:#315bd6}
+.principle{font-size:13px;margin-top:8px}.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.meta span{font-size:10px;background:var(--soft);padding:4px 7px;border-radius:99px}
+.sources{margin-top:14px;padding-top:12px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+.source-count{font-size:11px;font-weight:700}
+.selection-bar{position:sticky;bottom:15px;margin-top:22px;background:#151515;color:#fff;border-radius:11px;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 25px #0002}
+.compare-card{margin-top:27px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:780px}
+th,td{text-align:left;padding:14px 15px;border-bottom:1px solid #eee;font-size:12px;vertical-align:top}th{background:#fafaf8}
+th:first-child,td:first-child{width:190px;font-weight:700}.pill{display:inline-block;padding:5px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.high{background:var(--green-soft);color:var(--green)}.medium{background:#fff5df;color:#916000}.unknown{background:#f1f1f1;color:#666}
+.investigate-check{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="topbar">
+  <div class="logo" onclick="show('landing')">ScoutBeyond</div>
+  <div class="progress" id="progress"><span class="on"></span><span></span><span></span><span></span><span></span></div>
+</header>
+
+<main class="content">
+
+<!-- 0 LANDING PAGE -->
+<section id="landing" class="screen active">
+  <div class="landing-hero">
+    <h1>Accelerate engineering discovery.</h1>
+    <p>Define physical engineering problems, discover transferable solutions across industries, and export evidence-backed scouting briefs instantly.</p>
+    <button class="btn primary" style="font-size: 15px; padding: 14px 28px;" onclick="show('define')">Start a new scouting session →</button>
+  </div>
+</section>
+
+<!-- 1 DEFINE -->
+<section id="define" class="screen">
+  <div class="eyebrow">Step 1 · Define</div>
+  <h1>What physical engineering problem are you trying to solve?</h1>
+  <p class="sub">Describe the challenge in your own words. You don't need to know the technical terminology.</p>
+  <div class="panel">
+    <div class="panel-title">Engineering challenge</div>
+    <textarea id="input" placeholder="e.g. We want to clean industrial parts with less water and less time." oninput="checkInput()"></textarea>
+    <div class="actions">
+      <button class="btn" onclick="show('landing')">← Back</button>
+      <!-- Button disabled by default -->
+      <button id="btn-define-continue" class="btn primary" onclick="interpret()" disabled>Continue →</button>
+    </div>
+  </div>
+</section>
+
+<!-- 2 REFINE -->
+<section id="refine" class="screen">
+  <div class="eyebrow">Step 2 · Refine</div>
+  <h1>Let's make sure we understood the problem.</h1>
+  <div class="ref-layout">
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Research brief</h2></div>
+        <button class="edit" onclick="alert('Prototype: Opens inline editing modal.')">✎ Edit</button>
+      </div>
+      <div class="card-body">
+        <div class="ref-row"><div class="ref-label">Problem</div><div class="ref-value" id="problem">How can cleaning be adapted to actual cleaning need?</div></div>
+        <div class="ref-row"><div class="ref-label">Goals</div><div class="chips"><span class="chip editable">Reduce water</span><span class="chip editable">Reduce cleaning time</span></div></div>
+        <div class="ref-row"><div class="ref-label">Constraints</div><div class="chips"><span class="chip editable">Industrial environment</span><span class="chip editable">Prefer existing equipment</span></div></div>
+        <div class="ref-row"><div class="ref-label">Assumptions</div><div class="chips"><span class="chip editable">Cleaning intensity can be adapted</span></div></div>
+        <div class="ref-row"><div class="ref-label">Unknowns</div><div class="chips"><span class="chip editable">Contamination type</span><span class="chip editable">Required cleanliness level</span></div></div>
+        <div class="ref-row"><div class="ref-label">Search dimensions</div><div class="chips"><span class="chip">Adaptive cleaning</span><span class="chip">Contamination detection</span><span class="chip">Feedback control</span><span class="chip">Surface engineering</span></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-head"><div><h2>Research scope</h2></div></div>
+        <div class="card-body">
+          <div class="scope-list">
+            
+            <div class="scope-item">
+              <strong>Industry focus</strong>
+              <div class="priority-list">
+                <div class="priority-item"><span>Within your industry</span> <label class="priority-toggle"><input type="radio" name="industry_focus" value="within"> Prioritize</label></div>
+                <div class="priority-item"><span>Beyond your industry</span> <label class="priority-toggle"><input type="radio" name="industry_focus" value="beyond"> Prioritize</label></div>
+                <div class="priority-item"><span>No preference (Balanced)</span> <label class="priority-toggle"><input type="radio" name="industry_focus" value="balanced" checked> Default</label></div>
+              </div>
+            </div>
+
+            <div class="scope-item">
+              <strong>Evidence sources</strong>
+              <div class="priority-list">
+                <div class="priority-item"><span>Scientific papers</span> <label class="priority-toggle"><input type="checkbox"> Prioritize</label></div>
+                <div class="priority-item"><span>Patents</span> <label class="priority-toggle"><input type="checkbox"> Prioritize</label></div>
+                <div class="priority-item"><span>Industrial cases</span> <label class="priority-toggle"><input type="checkbox"> Prioritize</label></div>
+                <div class="priority-item"><span>Technical documentation</span> <label class="priority-toggle"><input type="checkbox"> Prioritize</label></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn" onclick="show('define')">← Back</button>
+    <button class="btn primary" onclick="startDiscovery()">Start research →</button>
+  </div>
+</section>
+
+<!-- 3 LANDSCAPE -->
+<section id="landscape" class="screen">
+  <div class="eyebrow">Step 3 · Discover</div>
+  <h1>What could solve this problem?</h1>
+  
+  <div class="tabs"><button class="tab active">Within your industry</button><button class="tab">Beyond your industry</button></div>
+  <div class="landscape-grid">
+    <article class="solution selected" data-select><div class="sol-top"><div><h3>Adaptive high-pressure jet cleaning</h3></div><span class="check">✓</span></div>
+      <div class="sources"><span class="source-count">8 evidences</span><button class="source-btn" onclick="openEvidence()">View sources →</button></div></article>
+    <article class="solution selected" data-select><div class="sol-top"><div><h3>Adaptive cleaning control</h3></div><span class="check">✓</span></div>
+      <div class="sources"><span class="source-count">6 evidences</span><button class="source-btn" onclick="openEvidence()">View sources →</button></div></article>
+  </div>
+  
+  <div class="actions" style="margin-top:30px; margin-bottom: 5px;">
+    <button class="btn" onclick="show('refine')">← Back</button>
+  </div>
+  <div class="selection-bar"><span><b id="count">2</b> solutions selected</span><button class="btn" style="background:#fff;color:#151515" onclick="show('compare')">Compare selected →</button></div>
+</section>
+
+<!-- 4 COMPARE -->
+<section id="compare" class="screen">
+  <div class="eyebrow">Step 4 · Compare</div>
+  <h1>Which solutions are worth pursuing?</h1>
+  <div class="compare-card">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Criteria</th><th>Adaptive jet cleaning</th><th>Adaptive cleaning control</th></tr></thead>
+      <tbody>
+        <tr><td>Water reduction</td><td><span class="pill high">High</span><button class="source-btn" onclick="openEvidence()" style="display:block; margin-top:6px;">4 supporting evidences →</button></td><td><span class="pill high">High</span></td></tr>
+        <tr><td>Key uncertainty</td><td><span class="pill unknown">Unknown</span> Actual savings</td><td><span class="pill unknown">Unknown</span> Sensor reliability</td></tr>
+        <tr>
+          <td style="font-weight:700;">Investigate further</td>
+          <td><label class="investigate-check"><input type="checkbox" checked> Selected</label></td>
+          <td><label class="investigate-check"><input type="checkbox"> Select</label></td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+  
+  <div class="actions" style="margin-top:30px; margin-bottom: 5px;">
+    <button class="btn" onclick="show('landscape')">← Back</button>
+  </div>
+  <div class="selection-bar"><span><b>1</b> solution selected</span><button class="btn primary" style="background:#fff;color:#151515" onclick="show('export')">Review & Export →</button></div>
+</section>
+
+<!-- 5 EXPORT HUB -->
+<section id="export" class="screen">
+  <div class="eyebrow">Step 5 · Final Result</div>
+  <h1 style="text-align:center;">Your Scouting Brief is ready</h1>
+  <p class="sub" style="text-align:center; margin:0 auto 30px;">Review the document preview below. Since ScoutBeyond does not save your history, you must export this brief now to keep your research.</p>
+  
+  <div class="doc-preview" id="pdf-content">
+    <div class="doc-header">
+      <p style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#6d6d6d; margin:0 0 5px;">ScoutBeyond Technology Brief</p>
+      <h2>Adaptive high-pressure jet cleaning</h2>
+    </div>
+    
+    <div class="doc-section">
+      <h3>Solution Summary</h3>
+      <p class="doc-text">Adjusting pressure and flow to the actual cleaning need instead of using a fixed cycle. This approach demonstrates a high problem fit for reducing water consumption and cleaning time within standard industrial environments. The technology maturity is high, though it relies heavily on accurate contamination detection geometry.</p>
+    </div>
+
+    <div class="doc-section">
+      <h3>Key Trade-offs & Uncertainties</h3>
+      <p class="doc-text"><strong>Primary Limitation:</strong> Performance depends heavily on the specific contamination type and part geometry.<br><strong>Primary Uncertainty:</strong> Actual utility and operational cost savings under variable daily operating conditions remain unproven in this specific line.</p>
+    </div>
+
+    <div class="doc-section" style="border:none;">
+      <h3>Validated Resources (Primary Evidences)</h3>
+      <div class="doc-biblio-item"><strong>[1]</strong> <em>Optimization of high-pressure water jet cleaning based on surface contamination feedback</em>. Journal of Manufacturing Processes (2023). DOI: 10.1016/j.jmapro.2023.01.022</div>
+      <div class="doc-biblio-item"><strong>[2]</strong> <em>Adaptive cleaning system utilizing variable pressure nozzles</em>. US Patent US11027315B2, Siemens AG (Granted 2021).</div>
+      <div class="doc-biblio-item"><strong>[3]</strong> <em>Real-time flow adjustment for industrial washing stations.</em> Procedia CIRP (2022).</div>
+    </div>
+  </div>
+
+  <div class="actions" style="justify-content:center; gap:12px;">
+    <button class="btn" onclick="show('compare')">← Back to Compare</button>
+    <button class="btn primary" id="export-pdf-btn" style="font-size:14px; padding: 12px 24px;" onclick="generatePDF()">↓ Export as PDF</button>
+  </div>
+
+  <div style="text-align:center; margin-top: 40px; border-top: 1px solid var(--line); padding-top: 40px;">
+    <p style="font-size:13px; margin-bottom:16px;">Finished with this report?</p>
+    <button class="btn" onclick="show('landing')">Return to Home (Closes Session)</button>
+  </div>
+</section>
+
+</main></div>
+
+<!-- VAGUENESS CLARIFICATION MODAL -->
+<div class="modal-overlay" id="helper-modal" onclick="closeHelper(event)">
+  <div class="modal-content" style="max-width: 500px; height: auto;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2 style="margin:0; font-size:16px;">Please clarify your request</h2>
+      </div>
+      <button class="btn" onclick="document.getElementById('helper-modal').classList.remove('active')">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; margin-bottom:15px; color:var(--text);">Your problem description is too broad to yield targeted engineering solutions. Which specific outcome is closest to what you're trying to achieve?</p>
+      
+      <div class="choices" style="grid-template-columns: 1fr;">
+        <button class="choice" onclick="clarify('Reduce the water used during industrial cleaning')">Focus: Reduce water consumption</button>
+        <button class="choice" onclick="clarify('Reduce the time needed to clean industrial parts')">Focus: Reduce cleaning cycle time</button>
+        <button class="choice" onclick="clarify('Improve cleaning effectiveness without changing the product')">Focus: Improve cleaning effectiveness</button>
+        <button class="choice" style="background:var(--soft);" onclick="document.getElementById('helper-modal').classList.remove('active'); document.getElementById('input').focus();">None of these — I will rewrite my statement</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EVIDENCE MODAL -->
+<div class="modal-overlay" id="evidence-modal" onclick="closeEvidence(event)">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h2 style="margin:0; font-size:16px;">Supporting Evidence</h2>
+        <p style="font-size:12px; margin-top:2px;">Adaptive high-pressure jet cleaning</p>
+      </div>
+      <button class="btn" onclick="document.getElementById('evidence-modal').classList.remove('active')">✕ Close</button>
+    </div>
+    <div class="modal-body" id="modal-body-content">
+      <!-- Content populated by JS (Skeleton vs Loaded Data) -->
+    </div>
+  </div>
+</div>
+
+<script>
+const ids=["landing","define","refine","landscape","compare","export"];
+let current=0; 
+let evidenceLoaded = false;
+
+function show(id){
+  current=ids.indexOf(id);
+  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  
+  if(id === 'landing') {
+    document.getElementById("progress").classList.add("hidden");
+  } else {
+    document.getElementById("progress").classList.remove("hidden");
+    const progressIndex = current - 1;
+    document.querySelectorAll("#progress span").forEach((x,i)=>x.classList.toggle("on",i<=progressIndex));
+  }
+  window.scrollTo({top:0,behavior:"smooth"})
+}
+
+// Word Count / Blank Check Logic
+function checkInput() {
+  const v = document.getElementById("input").value.trim();
+  const btn = document.getElementById("btn-define-continue");
+  
+  // Enable button as long as it is not completely empty
+  btn.disabled = v.length === 0;
+}
+
+// Interpretation Logic
+function interpret(){
+  const v = document.getElementById("input").value.trim();
+  
+  // Hardcoded test strings to trigger the prototype modal for judges/demo purposes
+  if(/test|asdf/i.test(v)){
+    document.getElementById("helper-modal").classList.add("active");
+    return;
+  }
+  
+  document.getElementById("problem").textContent = v;
+  show("refine");
+}
+
+function clarify(v){
+  document.getElementById("helper-modal").classList.remove("active");
+  document.getElementById("problem").textContent = v;
+  show("refine");
+}
+
+function closeHelper(e){ 
+  if(e.target === document.getElementById('helper-modal')){ 
+    document.getElementById('helper-modal').classList.remove('active'); 
+  } 
+}
+
+// Latency Simulation Logic - Progressive Unlocking
+function startDiscovery(){
+  show('landscape');
+  evidenceLoaded = false;
+  
+  setTimeout(() => {
+    evidenceLoaded = true;
+    if (document.getElementById('evidence-modal').classList.contains('active')) {
+      renderEvidenceContent();
+    }
+  }, 3000);
+}
+
+function openEvidence(){ 
+  document.getElementById('evidence-modal').classList.add('active'); 
+  renderEvidenceContent();
+}
+
+function closeEvidence(e){ 
+  if(e.target === document.getElementById('evidence-modal')){ 
+    document.getElementById('evidence-modal').classList.remove('active'); 
+  } 
+}
+
+function renderEvidenceContent() {
+  const container = document.getElementById('modal-body-content');
+  
+  if (!evidenceLoaded) {
+    container.innerHTML = `
+      <div class="skel-item">
+        <div class="skel-badge skeleton"></div><div class="skel-badge skeleton"></div>
+        <div class="skel-title skeleton"></div>
+        <div class="skel-text skeleton"></div>
+        <div class="skel-text skeleton" style="width: 80%"></div>
+      </div>
+      <div class="skel-item">
+        <div class="skel-badge skeleton"></div><div class="skel-badge skeleton"></div>
+        <div class="skel-title skeleton"></div>
+        <div class="skel-text skeleton"></div>
+        <div class="skel-text skeleton" style="width: 90%"></div>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <div class="source-item">
+        <div class="source-meta"><span>Scientific Paper</span> <span>2023</span> <span>94% Relevance</span></div>
+        <a class="source-title" href="#" target="_blank">Optimization of high-pressure water jet cleaning based on surface contamination feedback ↗</a>
+        <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">Journal of Manufacturing Processes · DOI: 10.1016/j.jmapro.2023.01.022</p>
+        <div class="source-snippet">"Implementation of variable flow control linked to optical contamination detection resulted in a 42% reduction in water usage compared to fixed-cycle baselines..."</div>
+      </div>
+      <div class="source-item">
+        <div class="source-meta"><span>Patent</span> <span>Granted 2021</span> <span>88% Relevance</span></div>
+        <a class="source-title" href="#" target="_blank">Adaptive cleaning system utilizing variable pressure nozzles ↗</a>
+        <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">US11027315B2 · Siemens AG</p>
+        <div class="source-snippet">"A system comprising a high-pressure pump and control unit configured to dynamically alter the jet pressure in real-time based on acoustic feedback from the impact zone..."</div>
+      </div>
+    `;
+  }
+}
+
+// Client-Side PDF Generation Logic
+function generatePDF() {
+  const element = document.getElementById('pdf-content');
+  const btn = document.getElementById('export-pdf-btn');
+  
+  btn.textContent = 'Generating PDF...';
+  btn.disabled = true;
+
+  const opt = {
+    margin:       15,
+    filename:     'ScoutBeyond_Tech_Brief.pdf',
+    image:        { type: 'jpeg', quality: 1 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(element).save().then(() => {
+    btn.textContent = '↓ Export as PDF';
+    btn.disabled = false;
+  });
+}
+
+document.querySelectorAll("[data-select]").forEach(card=>card.addEventListener("click",e=>{
+  if(e.target.closest("button") || e.target.closest("a")) return;
+  card.classList.toggle("selected");
+  card.querySelector(".check").textContent=card.classList.contains("selected")?"✓":"";
+}))
+</script>
+</body></html>

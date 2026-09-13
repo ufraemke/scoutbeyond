@@ -13,6 +13,7 @@ import {
   appendResearchEvent,
   claimWebhookDelivery,
   findSourceByCanonicalUrl,
+  listSourceProgress,
   markWebhookProcessed,
   refreshRunCounters,
   updateScrapeJobByFirecrawlId,
@@ -22,6 +23,10 @@ import {
 import { canonicalizeUrl } from "./url";
 import { analyseSource } from "./analyse-source";
 import { finalizeRun, maybeStartCounterCheck } from "./counter-check";
+import {
+  isSourceAnalysisTerminal,
+  terminalSourceAnalysisPatch,
+} from "./progress";
 
 export type WebhookHandleResult = {
   status: "ok" | "duplicate" | "unauthorized" | "ignored";
@@ -177,11 +182,13 @@ async function handleBatchPage(input: {
   }
 
   if (input.page.error || input.error) {
+    const errorMessage =
+      input.page.error || input.error || "Source scrape failed.";
     await updateSource(source.id, {
-      status: "failed",
-      analysis_status: "skipped",
+      ...terminalSourceAnalysisPatch("skipped", {
+        errorMessage,
+      }),
       scrape_id: input.page.scrapeId ?? source.scrapeId,
-      error_message: input.page.error || input.error,
       metadata: input.page.metadata ?? {},
     });
     await appendResearchEvent({
@@ -199,11 +206,13 @@ async function handleBatchPage(input: {
     source.status === "scraped" ||
     source.status === "analysing" ||
     source.status === "analysed";
+  const markdown = input.page.markdown ?? source.markdown;
+  const hasMarkdown = Boolean(markdown?.trim());
 
   const updated = await updateSource(source.id, {
     status: alreadyScraped && source.markdown ? source.status : "scraped",
     title: input.page.title ?? source.title,
-    markdown: input.page.markdown ?? source.markdown,
+    markdown,
     scrape_id: input.page.scrapeId ?? source.scrapeId,
     metadata: input.page.metadata ?? source.metadata ?? {},
     scraped_at: source.scrapedAt ?? new Date().toISOString(),
@@ -211,6 +220,11 @@ async function handleBatchPage(input: {
       source.analysisStatus === "completed" || source.analysisStatus === "running"
         ? source.analysisStatus
         : "queued",
+    ...(!hasMarkdown
+      ? terminalSourceAnalysisPatch("skipped", {
+          errorMessage: "No scraped content available.",
+        })
+      : {}),
   });
 
   if (!alreadyScraped) {
@@ -223,6 +237,16 @@ async function handleBatchPage(input: {
   }
 
   await refreshRunCounters(runId);
+
+  if (!hasMarkdown) {
+    await appendResearchEvent({
+      researchRunId: runId,
+      eventType: "source_analysis_skipped",
+      message: `Skipped ${updated.title || updated.url} — no scraped content.`,
+      payload: { sourceId: updated.id },
+    });
+    return null;
+  }
 
   if (updated.analysisStatus === "queued" && updated.markdown) {
     return updated.id;
@@ -298,19 +322,14 @@ async function handleBatchFailed(
 }
 
 async function finalizeIfReady(researchRunId: string): Promise<void> {
-  const { listSources, getResearchRun } = await import("./repository");
+  const { getResearchRun } = await import("./repository");
   const run = await getResearchRun(researchRunId);
   if (!run) return;
   if (run.status === "completed" || run.status === "failed") return;
 
-  const sources = await listSources(researchRunId);
+  const sources = await listSourceProgress(researchRunId);
   const unfinished = sources.some(
-    (s) =>
-      s.analysisStatus === "pending" ||
-      s.analysisStatus === "queued" ||
-      s.analysisStatus === "running" ||
-      s.status === "discovered" ||
-      s.status === "scraping",
+    (source) => !isSourceAnalysisTerminal(source),
   );
   if (unfinished) {
     return;

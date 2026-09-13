@@ -71,6 +71,12 @@ Confirmed or unconfirmed assumptions: ${JSON.stringify(
     )}
 Known unknowns: ${JSON.stringify(problem.unknowns)}
 User-reviewed search dimensions: ${JSON.stringify(problem.searchDimensions)}
+Research priorities: ${JSON.stringify(
+      problem.researchPreferences ?? {
+        industryFocus: "balanced",
+        evidenceTypes: [],
+      },
+    )}
 
 Hard rules:
 - Do NOT return an undifferentiated list of similar queries.
@@ -82,6 +88,8 @@ Hard rules:
   - emerging: 1-2
 - Search by function and physical principle, not only application name.
 - Prefer physical / equipment / process / sensing technologies.
+- Research priorities influence emphasis only. They must never remove any required search dimension.
+- If evidence types are prioritized, include suitable paper, patent, case-study, or technical-documentation queries across the diversified set.
 
 Return JSON:
 {
