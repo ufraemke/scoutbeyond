@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useMemo, useState } from "react";
 import { AppHeader } from "@/components/layout/app-header";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CandidateComparison } from "@/components/research/candidate-comparison";
 import { CandidateDetailDialog } from "@/components/research/candidate-detail-dialog";
 import { CandidateLandscape } from "@/components/research/candidate-landscape";
 import { FinalResearchBrief } from "@/components/research/final-research-brief";
 import { ResearchEventList } from "@/components/research/research-event-list";
 import { ResearchProgress } from "@/components/research/research-progress";
+import { RunBriefSummary } from "@/components/research/run-brief-summary";
 import { useResearchRun } from "@/components/research/use-research-run";
 import type { LiveCandidateRecord } from "@/types";
 
@@ -21,12 +22,14 @@ export default function ResearchRunPage({
   const router = useRouter();
   const { runId } = use(params);
   const { snapshot, connection, error, refetch, resume } = useResearchRun(runId);
-  const [view, setView] = useState<3 | 4 | 5>(3);
+  const [view, setView] = useState<2 | 3 | 4 | 5>(3);
+  const [maxView, setMaxView] = useState<3 | 4 | 5>(3);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [shortlistedIds, setShortlistedIds] = useState<string[]>([]);
   const [activeCandidate, setActiveCandidate] =
     useState<LiveCandidateRecord | null>(null);
   const [resumeMessage, setResumeMessage] = useState<string | null>(null);
+  const [confirmingNewScan, setConfirmingNewScan] = useState(false);
 
   const selectedCandidates = useMemo(
     () =>
@@ -43,6 +46,16 @@ export default function ResearchRunPage({
     [selectedCandidates, shortlistedIds],
   );
   const preliminary = snapshot?.run.status !== "completed";
+
+  function goToView(nextView: 2 | 3 | 4 | 5) {
+    setView(nextView);
+    if (nextView >= 3) {
+      setMaxView((current) =>
+        Math.max(current, nextView) as 3 | 4 | 5,
+      );
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   function toggleCandidate(candidateId: string) {
     setSelectedIds((current) =>
@@ -82,7 +95,21 @@ export default function ResearchRunPage({
   return (
     <div className="min-h-screen bg-[#f7f7f5] text-[#161616]">
       <div className="print-hidden">
-        <AppHeader currentStep={view} maxAvailableStep={view} />
+        <AppHeader
+          currentStep={view}
+          maxAvailableStep={maxView}
+          onHome={(event) => {
+            event.preventDefault();
+            setConfirmingNewScan(true);
+          }}
+          onStepChange={(step) => {
+            if (step === 1) {
+              setConfirmingNewScan(true);
+            } else if (step >= 2 && step <= maxView) {
+              goToView(step as 2 | 3 | 4 | 5);
+            }
+          }}
+        />
       </div>
 
       <main className="mx-auto max-w-[1120px] px-6 py-10 sm:px-8">
@@ -110,6 +137,14 @@ export default function ResearchRunPage({
 
         {snapshot ? (
           <>
+            {view === 2 ? (
+              <RunBriefSummary
+                problem={snapshot.run.structuredProblem}
+                onBack={() => setConfirmingNewScan(true)}
+                onContinue={() => goToView(3)}
+              />
+            ) : null}
+
             {view === 3 ? (
               <>
                 <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
@@ -121,12 +156,22 @@ export default function ResearchRunPage({
                       Candidate Technology Landscape
                     </h1>
                   </div>
-                  <Link
-                    href="/"
-                    className="rounded-[9px] border border-[#d5d5d0] bg-white px-4 py-2 text-[12px] font-semibold hover:bg-[#f7f7f5]"
-                  >
-                    New scan
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => goToView(2)}
+                      className="rounded-[9px] border border-[#d5d5d0] bg-white px-4 py-2 text-[12px] font-semibold hover:bg-[#f7f7f5]"
+                    >
+                      ← Back to brief
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingNewScan(true)}
+                      className="rounded-[9px] border border-[#d5d5d0] bg-white px-4 py-2 text-[12px] font-semibold hover:bg-[#f7f7f5]"
+                    >
+                      New scan
+                    </button>
+                  </div>
                 </div>
                 <ResearchProgress
                   run={snapshot.run}
@@ -173,7 +218,7 @@ export default function ResearchRunPage({
                   selectedIds={selectedIds}
                   completed={snapshot.run.status === "completed"}
                   onToggleCandidate={toggleCandidate}
-                  onCompare={() => setView(4)}
+                  onCompare={() => goToView(4)}
                   onOpenCandidate={setActiveCandidate}
                 />
               </>
@@ -188,8 +233,8 @@ export default function ResearchRunPage({
                 preliminary={preliminary}
                 onToggleShortlist={toggleShortlist}
                 onOpenCandidate={setActiveCandidate}
-                onBack={() => setView(3)}
-                onContinue={() => setView(5)}
+                onBack={() => goToView(3)}
+                onContinue={() => goToView(5)}
               />
             ) : null}
 
@@ -199,8 +244,8 @@ export default function ResearchRunPage({
                 candidates={shortlistedCandidates}
                 evidence={snapshot.evidence}
                 preliminary={preliminary}
-                onBack={() => setView(4)}
-                onStartNew={() => router.push("/")}
+                onBack={() => goToView(4)}
+                onStartNew={() => router.push("/?start=1")}
               />
             ) : null}
           </>
@@ -214,6 +259,16 @@ export default function ResearchRunPage({
           onClose={() => setActiveCandidate(null)}
         />
       ) : null}
+
+      <ConfirmationDialog
+        open={confirmingNewScan}
+        title="Start a new scan?"
+        description="You will leave this research and lose the current comparison and shortlist selections. The research run itself will remain available at this URL."
+        cancelLabel="Keep this research"
+        confirmLabel="Start new scan"
+        onCancel={() => setConfirmingNewScan(false)}
+        onConfirm={() => router.push("/?start=1")}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/layout/app-header";
 import { EditableResearchBrief } from "@/components/research/editable-research-brief";
 import { ensureAnonymousSession } from "@/lib/supabase/anonymous";
@@ -15,9 +15,16 @@ type ClarificationPrompt = {
   options: string[];
 };
 
-export default function Home() {
+export default function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ start?: string | string[] }>;
+}) {
   const router = useRouter();
-  const [started, setStarted] = useState(false);
+  const query = use(searchParams);
+  const startAtIntake =
+    (Array.isArray(query.start) ? query.start[0] : query.start) === "1";
+  const [started, setStarted] = useState(startAtIntake);
   const [step, setStep] = useState<1 | 2>(1);
   const [rawInput, setRawInput] = useState("");
   const [brief, setBrief] = useState<StructuredProblem | null>(null);
@@ -36,6 +43,7 @@ export default function Home() {
     setStarted(false);
     setStep(1);
     setError(null);
+    if (startAtIntake) router.replace("/");
   }
 
   function updateInput(value: string) {

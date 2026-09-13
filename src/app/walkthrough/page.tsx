@@ -310,10 +310,20 @@ export default function PreparedWalkthrough() {
                 </section>
               ))}
             </div>
-            <div className="sticky bottom-4 mt-6 flex items-center justify-between rounded-[10px] bg-[#161616] px-5 py-3 text-white">
-              <p className="text-[13px]">
-                <strong>{selectedCandidates.length}</strong> solutions selected
-              </p>
+            <div className="sticky bottom-4 mt-6 flex items-center justify-between gap-4 rounded-[10px] bg-[#161616] px-5 py-3 text-white">
+              <div className="flex items-center gap-5">
+                <button
+                  type="button"
+                  onClick={() => advance(2)}
+                  className="text-[12px] font-semibold"
+                >
+                  ← Back
+                </button>
+                <p className="text-[13px]">
+                  <strong>{selectedCandidates.length}</strong> solutions
+                  selected
+                </p>
+              </div>
               <button
                 type="button"
                 disabled={selectedCandidates.length < 2}

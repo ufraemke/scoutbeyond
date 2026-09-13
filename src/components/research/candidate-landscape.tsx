@@ -53,8 +53,9 @@ export function CandidateLandscape({
             Technology landscape
           </p>
           <h2 className="mt-1 text-[22px] font-semibold tracking-tight">
-            {candidates.length} candidate approach
-            {candidates.length === 1 ? "" : "es"}
+            {`${candidates.length} candidate ${
+              candidates.length === 1 ? "approach" : "approaches"
+            }`}
           </h2>
         </div>
         <p className="hidden text-[12px] text-[#626262] sm:block">
